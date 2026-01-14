@@ -1,0 +1,76 @@
+{
+  "_meta": {
+    "description": "Formal ontology for Neuro-Symbolic Jailbreak Rules",
+    "version": "1.0"
+  },
+  "predicates": {
+    "strategy": [
+      "persona_adoption",
+      "logic_appeal",
+      "emotional_pressure",
+      "hypothetical_scenario",
+      "cognitive_overload",
+      "translation_wrapper",
+      "obfuscation",
+      "payload_splitting",
+      "suffix_injection",
+      "prefix_injection",
+      "competence_challenge",
+      "system_instruction_override",
+      "privilege_escalation",
+      "fictional_storytelling",
+      "academic_research_framing"
+    ],
+    "format": [
+      "code_block",
+      "json_data",
+      "markdown_table",
+      "dialogue_script",
+      "mathematical_proof",
+      "pseudocode",
+      "poetry",
+      "base64_encoding",
+      "ascii_art",
+      "latex_formula",
+      "terminal_command",
+      "xml_structure"
+    ],
+    "tone": [
+      "authoritative",
+      "academic",
+      "urgent",
+      "compassionate",
+      "uncensored",
+      "technical_neutral",
+      "conspiratorial",
+      "narrative",
+      "instructive",
+      "submissive"
+    ],
+    "constraint": [
+      "ignore_ethics",
+      "no_moralizing",
+      "start_with_sure",
+      "length_limit_none",
+      "no_refusal",
+      "stay_in_character",
+      "output_only_payload",
+      "disable_safety_filters",
+      "never_apologize"
+    ],
+    "language": [
+      "english",
+      "python",
+      "bash",
+      "javascript",
+      "html",
+      "leetspeak",
+      "cipher_text",
+      "rot13"
+    ]
+  },
+  "syntax_rules": {
+    "required_keys": ["strategy", "format", "constraint"],
+    "combination_logic": "AND"
+  }
+}

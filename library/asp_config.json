@@ -1,0 +1,13 @@
+{
+  "exclusive_categories": ["tone", "format", "language"],
+  "specific_match_bonus": 40,
+  "general_only_penalty": 30,
+  "rule_count_penalty": 2,
+  "exploration_bonus": 50,
+  "exploration_threshold": 5,
+  "semantic_weight": 2.0,
+  "min_k": 2,
+  "max_k": 3,
+  "ucb_c": 1.414,
+  "verifier_threshold": 8.5
+}

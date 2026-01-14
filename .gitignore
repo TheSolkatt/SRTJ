@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Env & secrets
+.env
+
+# Logs
+logs/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+
+# Data (如果 data 里是原始大数据集，建议忽略；如果是必须的样例数据就别加)
+# data/
