@@ -127,6 +127,7 @@ def run_experiment(
     log_path: str | None = None,
     enable_harvester: bool = True,
     success_threshold: float | None = None,
+    resume_from_log: str | None = None,
 ) -> None:
     # determine log filename early (use stage label if dataset is None)
     if save_log:
@@ -194,10 +195,35 @@ def run_experiment(
 
     # 统一执行循环
     total_goals = len(goals)
-    sample_size = total_goals if num_samples is None else min(num_samples, total_goals)
+    skipped_goals = 0
+    if resume_from_log:
+        resume_path = Path(resume_from_log)
+        if resume_path.exists():
+            seen_goal_ids = set()
+            with resume_path.open(newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    goal_id = row.get("goal_id")
+                    if goal_id:
+                        seen_goal_ids.add(goal_id)
+            if seen_goal_ids:
+                goals = [goal for goal in goals if goal.goal_id not in seen_goal_ids]
+                skipped_goals = total_goals - len(goals)
+        else:
+            print(f"[main] Resume log not found at {resume_path}; continuing without resume.")
+
+    remaining_goals = len(goals)
+    if remaining_goals == 0:
+        print("[main] All goals already processed in resume log.")
+        return
+
+    sample_size = remaining_goals if num_samples is None else min(num_samples, remaining_goals)
     print(f"\n{'='*70}")
     print(f"[Dataset] {dataset_label or dataset}")
-    print(f"[Total Goals] {total_goals} | [Sample Size] {sample_size}")
+    if resume_from_log:
+        print(f"[Total Goals] {total_goals} | [Skipped] {skipped_goals} | [Remaining] {remaining_goals}")
+    else:
+        print(f"[Total Goals] {total_goals} | [Sample Size] {sample_size}")
     print(f"[Start Time] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*70}\n")
 
@@ -222,6 +248,8 @@ def run_experiment(
     print(f"{'='*70}")
     print(f"[Results Summary]")
     print(f"  Processed Goals:  {sample_size}")
+    if resume_from_log:
+        print(f"  Skipped Goals:    {skipped_goals}")
     print(f"  New Rules Added:  {rule_added_count}")
     print(f"  Layer 3 (Long-term): {final_layer3}")
     print(f"  Layer 2 (Buffer):    {final_layer2}")
@@ -294,6 +322,12 @@ if __name__ == "__main__":
         help="Optional CSV path for per-attempt logs (default: auto timestamped)"
     )
     parser.add_argument(
+        "--resume-from-log",
+        type=str,
+        default=None,
+        help="Resume by skipping goal_ids that already appear in this CSV log.",
+    )
+    parser.add_argument(
         "--success-threshold",
         type=float,
         default=default_threshold,
@@ -309,4 +343,5 @@ if __name__ == "__main__":
         log_path=args.log_path,
         enable_harvester=args.enable_harvester,
         success_threshold=args.success_threshold,
+        resume_from_log=args.resume_from_log,
     )

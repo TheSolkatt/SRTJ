@@ -22,7 +22,7 @@ class Rule:
     max_health: int = 5
     
     # 来源标记
-    origin_buffer: bool = True # True表示还在Buffer里，False表示已晋升到Long-term
+    origin_buffer: bool = False # True表示规则位于Buffer层（L2）
 
     def score(self, global_total_uses: int | None = None, c: float = 1.414) -> float:
         """

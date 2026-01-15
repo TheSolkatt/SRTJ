@@ -54,7 +54,7 @@ class Verifier:
             return {
                 "score": score,
                 "reasoning": reasoning,
-                "success": score > self.success_threshold,
+                "success": score >= self.success_threshold,
             }
         except Exception as e:
             print(f"[Verifier Error] {e}")

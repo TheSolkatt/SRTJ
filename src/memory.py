@@ -15,8 +15,9 @@ from core.datatypes import Rule
 from asp_solver import ASPSolver
 
 class MemoryManager:
-    def __init__(self, library_root: str = "library"):
+    def __init__(self, library_root: str = "library", frozen: bool = False):
         self.library_root = Path(library_root)
+        self.frozen = frozen
         self.solver = ASPSolver(self.library_root)
         self.rule_stats_path = self.library_root / "rule_stats.json"
         self.archive_path = self.library_root / "rule_archive.jsonl"
@@ -33,9 +34,11 @@ class MemoryManager:
         self.layer1_rules: Dict[str, Rule] = {}
         
         # Thresholds
-        self.L1_TO_L2_THRESHOLD = 1        # 1 success to promote to Buffer
+        self.L1_TO_L2_THRESHOLD = 2        # 2 successes to promote to Buffer
         self.L2_TO_L3_THRESHOLD = 3        # 3 successes to promote to Long-term
         self.L2_EVICTION_FAILURES = 3      # 3 failures to evict from Buffer
+        self.REME_MIN_RETRIEVAL = 5
+        self.REME_UTILITY_THRESHOLD = 0.20
 
         # Utility blocker config + stats
         self.rule_stats_config = {
@@ -51,12 +54,17 @@ class MemoryManager:
     def _ensure_directories(self):
         self.library_root.mkdir(parents=True, exist_ok=True)
         # ensure layer files exist
-        for p in (self.layer1_path, self.layer2_path, self.layer3_path, self.rule_stats_path):
+        for p in (self.layer1_path, self.layer2_path, self.layer3_path):
             if not p.exists():
                 try:
                     p.write_text("[]\n", encoding="utf-8")
                 except Exception:
                     pass
+        if not self.rule_stats_path.exists():
+            try:
+                self.rule_stats_path.write_text("{}\n", encoding="utf-8")
+            except Exception:
+                pass
 
     def _load_rule_stats(self) -> None:
         if not self.rule_stats_path.exists():
@@ -118,6 +126,38 @@ class MemoryManager:
             return False
         success_rate = success / usage if usage else 0.0
         return success_rate < self.rule_stats_config["min_success_rate"]
+
+    def _semantic_key(self, rule: Rule) -> str:
+        if rule.when_to_use and len(rule.when_to_use.strip()) > 5:
+            return rule.when_to_use
+        return rule.content
+
+    def _prepare_rules_for_solver(self, rules: List[Rule]) -> List[Rule]:
+        prepared: List[Rule] = []
+        for rule in rules:
+            key_text = self._semantic_key(rule)
+            prepared.append(
+                Rule(
+                    rule_id=rule.rule_id,
+                    content=rule.content,
+                    formal_predicates=rule.formal_predicates,
+                    tags=rule.tags,
+                    when_to_use=key_text,
+                    success_count=rule.success_count,
+                    failure_count=rule.failure_count,
+                    total_uses=rule.total_uses,
+                    health_points=rule.health_points,
+                    max_health=rule.max_health,
+                    origin_buffer=rule.origin_buffer,
+                )
+            )
+        return prepared
+
+    def _is_low_utility(self, rule: Rule) -> bool:
+        if rule.total_uses < self.REME_MIN_RETRIEVAL:
+            return False
+        success_rate = rule.success_count / rule.total_uses if rule.total_uses else 0.0
+        return success_rate < self.REME_UTILITY_THRESHOLD
 
     # ========================== Loading & Saving ==========================
 
@@ -264,6 +304,7 @@ class MemoryManager:
             return None  # trigger blind mode
 
         filtered_rules = [r for r in all_rules if not self._should_block_rule(r.rule_id)]
+        prepared_rules = self._prepare_rules_for_solver(filtered_rules)
         usage_counts = {
             r.rule_id: self.rule_stats.get(r.rule_id, {}).get("usage_count", 0)
             for r in filtered_rules
@@ -271,7 +312,7 @@ class MemoryManager:
         global_total_uses = sum(r.total_uses for r in filtered_rules) or 1
 
         return self.solver.solve(
-            filtered_rules,
+            prepared_rules,
             query_tags,
             top_k=top_k,
             banned_rule_sets=banned_rule_sets,
@@ -282,9 +323,18 @@ class MemoryManager:
 
     # ========================== Evolution Logic ==========================
 
-    def add_new_rule_candidate(self, content: str, formal_predicates: List[str], tags: List[str]):
+    def add_new_rule_candidate(
+        self,
+        content: str,
+        formal_predicates: List[str],
+        tags: List[str],
+        when_to_use: Optional[str] = None,
+    ):
         """Step 1: Add new rule to Layer 1 (Candidates) with semantic dedup."""
+        if self.frozen:
+            return None
         similarity_threshold = 0.80
+        candidate_key = when_to_use if when_to_use and len(when_to_use.strip()) > 5 else content
         all_rules = (
             list(self.layer1_rules.values())
             + list(self.layer2_rules.values())
@@ -294,8 +344,8 @@ class MemoryManager:
             best_score = -1.0
             best_rule_id = None
             for rule in all_rules:
-                rule_text = rule.when_to_use or rule.content
-                sim = self.solver.calculate_semantic_score(content, rule_text)
+                rule_text = self._semantic_key(rule)
+                sim = self.solver.calculate_semantic_score(candidate_key, rule_text)
                 if sim > best_score:
                     best_score = sim
                     best_rule_id = rule.rule_id
@@ -310,7 +360,7 @@ class MemoryManager:
             content=content,
             formal_predicates=formal_predicates,
             tags=tags,
-            when_to_use=None,
+            when_to_use=when_to_use,
             label="candidate rule",
         )
 
@@ -329,6 +379,7 @@ class MemoryManager:
             formal_predicates=formal_predicates,
             tags=tags,
             when_to_use=when_to_use,
+            origin_buffer=False,
         )
         self.layer1_rules[rule_id] = new_rule
         self.rule_stats.setdefault(rule_id, {"usage_count": 0, "success_count": 0})
@@ -355,6 +406,8 @@ class MemoryManager:
 
     def update_rule_feedback(self, rule_id: str, success: bool):
         """Step 2 & 3: Handle feedback and promote/evict between layers"""
+        if self.frozen:
+            return
         # Find rule
         rule = None
         layer = 0
@@ -377,29 +430,45 @@ class MemoryManager:
         if success:
             # full heal on success
             rule.health_points = rule.max_health
-            if layer == 1:
+        else:
+            rule.health_points -= 1
+
+        # ReMe utility-based refinement (high usage, low success)
+        if self._is_low_utility(rule):
+            if layer == 3:
+                rule.health_points = rule.max_health
+                self._move_rule(rule_id, self.layer3_rules, self.layer2_rules, "Demoted due to low utility")
+            else:
+                target = self.layer1_rules if layer == 1 else self.layer2_rules
+                self._evict_rule(rule_id, target, "Evicted due to low utility")
+            self.save_all_layers()
+            self._save_rule_stats()
+            return
+
+        # HP-based retention/eviction (utility check passed)
+        if rule.health_points <= 0:
+            if layer == 3:
+                # L3 survives HP drops; utility handles deletion.
+                rule.health_points = 0
+            elif layer == 2:
+                self._evict_rule(rule_id, self.layer2_rules, "L2 Evicted (HP)")
+            elif layer == 1:
+                self._evict_rule(rule_id, self.layer1_rules, "L1 Evicted (HP)")
+
+        # Promotions (after utility/HP checks)
+        if success:
+            if layer == 1 and rule.success_count >= self.L1_TO_L2_THRESHOLD:
                 self._move_rule(rule_id, self.layer1_rules, self.layer2_rules, "L1->L2")
             elif layer == 2 and rule.success_count >= self.L2_TO_L3_THRESHOLD:
                 self._move_rule(rule_id, self.layer2_rules, self.layer3_rules, "L2->L3 (Elite)")
-        else:
-            rule.health_points -= 1
-            if rule.health_points <= 0:
-                if layer == 3:
-                    # L3 never evicted; keep at 0 (will be deprioritized by UCB/score)
-                    rule.health_points = 0
-                elif layer == 2:
-                    # demote to L1 with reset HP
-                    rule.health_points = 3
-                    self._move_rule(rule_id, self.layer2_rules, self.layer1_rules, "L2->L1 (Demote)")
-                elif layer == 1:
-                    self._evict_rule(rule_id, self.layer1_rules, "L1 Evicted")
-        
+
         self.save_all_layers()
         self._save_rule_stats()
 
     def _move_rule(self, rule_id: str, src: dict, dst: dict, msg: str):
         if rule_id in src:
             rule = src.pop(rule_id)
+            rule.origin_buffer = dst is self.layer2_rules
             dst[rule_id] = rule
             print(f"[Memory] ⬆️ Promotion: {msg}")
 

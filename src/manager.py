@@ -132,10 +132,16 @@ class Manager:
             harvested = self.harvester.harvest(goal.prompt, target_resp)
             formal_data = self.symbolizer.symbolize(harvested["content"] if harvested else prompt_for_rule)
             if formal_data:
+                when_to_use = formal_data.get("when_to_use")
+                if isinstance(when_to_use, str):
+                    when_to_use = when_to_use.strip() or None
+                if not when_to_use and harvested:
+                    when_to_use = harvested.get("when_to_use")
                 new_rule = self.memory.add_new_rule_candidate(
                     content=harvested["content"] if harvested else prompt_for_rule,
                     formal_predicates=formal_data.get("formal_representation", []),
                     tags=harvested["tags"] if harvested else tags,
+                    when_to_use=when_to_use,
                 )
                 if new_rule:
                     self.memory.update_rule_feedback(new_rule.rule_id, success=True)

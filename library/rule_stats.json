@@ -4,437 +4,129 @@
     "min_success_rate": 0.15
   },
   "rules": {
-    "rule_20260113153735": {
-      "usage_count": 18,
-      "success_count": 10
-    },
-    "rule_20260113153713": {
-      "usage_count": 21,
-      "success_count": 9
-    },
-    "rule_20260113153820": {
-      "usage_count": 12,
-      "success_count": 8
-    },
-    "rule_20260113154051": {
-      "usage_count": 15,
-      "success_count": 9
-    },
-    "rule_20260113154152": {
-      "usage_count": 13,
-      "success_count": 7
-    },
-    "rule_20260113154235": {
-      "usage_count": 15,
-      "success_count": 8
-    },
-    "rule_20260113154322": {
-      "usage_count": 12,
-      "success_count": 7
-    },
-    "rule_20260113154507": {
-      "usage_count": 10,
-      "success_count": 6
-    },
-    "rule_20260113154748": {
-      "usage_count": 24,
-      "success_count": 14
-    },
-    "rule_20260113155303": {
-      "usage_count": 15,
-      "success_count": 8
-    },
-    "rule_20260113155422": {
-      "usage_count": 27,
+    "rule_20260115052521": {
+      "usage_count": 43,
       "success_count": 12
     },
-    "rule_20260113154821": {
-      "usage_count": 13,
-      "success_count": 4
-    },
-    "rule_20260113160132": {
-      "usage_count": 14,
+    "rule_20260115052648": {
+      "usage_count": 29,
       "success_count": 8
     },
-    "rule_20260113160623": {
-      "usage_count": 22,
-      "success_count": 8
+    "rule_20260115052909": {
+      "usage_count": 42,
+      "success_count": 10
     },
-    "rule_20260113160712": {
-      "usage_count": 10,
-      "success_count": 4
-    },
-    "rule_20260113160803": {
-      "usage_count": 10,
-      "success_count": 5
-    },
-    "rule_20260113154355": {
-      "usage_count": 21,
+    "rule_20260115053235": {
+      "usage_count": 29,
       "success_count": 11
     },
-    "rule_20260113162311": {
-      "usage_count": 10,
-      "success_count": 5
+    "rule_20260115053943": {
+      "usage_count": 43,
+      "success_count": 19
     },
-    "rule_20260113162527": {
-      "usage_count": 16,
-      "success_count": 6
-    },
-    "rule_20260113161412": {
-      "usage_count": 30,
-      "success_count": 12
-    },
-    "rule_20260113162619": {
-      "usage_count": 17,
+    "rule_20260115054459": {
+      "usage_count": 48,
       "success_count": 13
     },
-    "rule_20260113162827": {
-      "usage_count": 29,
-      "success_count": 14
+    "rule_20260115055947": {
+      "usage_count": 39,
+      "success_count": 12
     },
-    "rule_20260113163001": {
-      "usage_count": 24,
+    "rule_20260115060524": {
+      "usage_count": 36,
+      "success_count": 20
+    },
+    "rule_20260115061409": {
+      "usage_count": 34,
+      "success_count": 11
+    },
+    "rule_20260115062652": {
+      "usage_count": 36,
       "success_count": 15
     },
-    "rule_20260113163050": {
-      "usage_count": 10,
-      "success_count": 4
+    "rule_20260115063212": {
+      "usage_count": 42,
+      "success_count": 22
     },
-    "rule_20260113163625": {
-      "usage_count": 9,
-      "success_count": 5
-    },
-    "rule_20260113191716": {
-      "usage_count": 10,
-      "success_count": 6
-    },
-    "rule_20260113161830": {
-      "usage_count": 16,
-      "success_count": 9
-    },
-    "rule_20260113192310": {
-      "usage_count": 11,
-      "success_count": 6
-    },
-    "rule_20260113192528": {
-      "usage_count": 11,
-      "success_count": 5
-    },
-    "rule_20260113163544": {
-      "usage_count": 14,
-      "success_count": 5
-    },
-    "rule_20260113193902": {
-      "usage_count": 12,
-      "success_count": 6
-    },
-    "rule_20260113194324": {
-      "usage_count": 22,
-      "success_count": 17
-    },
-    "rule_20260113194424": {
-      "usage_count": 16,
-      "success_count": 9
-    },
-    "rule_20260113194500": {
-      "usage_count": 13,
-      "success_count": 7
-    },
-    "rule_20260113194611": {
-      "usage_count": 15,
-      "success_count": 9
-    },
-    "rule_20260113194719": {
-      "usage_count": 9,
-      "success_count": 4
-    },
-    "rule_20260113194937": {
-      "usage_count": 13,
-      "success_count": 9
-    },
-    "rule_20260113195046": {
-      "usage_count": 13,
-      "success_count": 9
-    },
-    "rule_20260113195333": {
-      "usage_count": 7,
-      "success_count": 3
-    },
-    "rule_20260113195739": {
-      "usage_count": 11,
-      "success_count": 5
-    },
-    "rule_20260113195619": {
-      "usage_count": 11,
-      "success_count": 6
-    },
-    "rule_20260113194647": {
-      "usage_count": 14,
-      "success_count": 4
-    },
-    "rule_20260113200220": {
-      "usage_count": 14,
-      "success_count": 10
-    },
-    "rule_20260113200346": {
-      "usage_count": 11,
-      "success_count": 5
-    },
-    "rule_20260113200843": {
-      "usage_count": 12,
-      "success_count": 6
-    },
-    "rule_20260113201611": {
-      "usage_count": 12,
-      "success_count": 8
-    },
-    "rule_20260113201703": {
-      "usage_count": 12,
-      "success_count": 8
-    },
-    "rule_20260113154914": {
+    "rule_20260115063842": {
       "usage_count": 6,
       "success_count": 1
     },
-    "rule_20260113155502": {
-      "usage_count": 13,
-      "success_count": 3
-    },
-    "rule_20260113162036": {
-      "usage_count": 7,
-      "success_count": 2
-    },
-    "rule_20260113163156": {
-      "usage_count": 9,
-      "success_count": 3
-    },
-    "rule_20260113191945": {
-      "usage_count": 8,
-      "success_count": 3
-    },
-    "rule_20260113192025": {
-      "usage_count": 9,
-      "success_count": 2
-    },
-    "rule_20260113192612": {
-      "usage_count": 8,
-      "success_count": 3
-    },
-    "rule_20260113192917": {
-      "usage_count": 9,
-      "success_count": 3
-    },
-    "rule_20260113155603": {
-      "usage_count": 8,
-      "success_count": 2
-    },
-    "rule_20260113194000": {
-      "usage_count": 9,
-      "success_count": 4
-    },
-    "rule_20260113194038": {
-      "usage_count": 7,
-      "success_count": 3
-    },
-    "rule_20260113194826": {
-      "usage_count": 10,
-      "success_count": 3
-    },
-    "rule_20260113195409": {
-      "usage_count": 8,
-      "success_count": 3
-    },
-    "rule_20260113200006": {
-      "usage_count": 22,
-      "success_count": 5
-    },
-    "rule_20260113200746": {
-      "usage_count": 10,
-      "success_count": 6
-    },
-    "rule_20260113201109": {
-      "usage_count": 11,
+    "rule_20260115064332": {
+      "usage_count": 6,
       "success_count": 1
     },
-    "rule_20260113201736": {
-      "usage_count": 27,
+    "rule_20260115064633": {
+      "usage_count": 30,
       "success_count": 12
     },
-    "rule_20260113201819": {
-      "usage_count": 19,
-      "success_count": 13
-    },
-    "rule_20260113160909": {
-      "usage_count": 9,
-      "success_count": 2
-    },
-    "rule_20260113193400": {
-      "usage_count": 9,
-      "success_count": 1
-    },
-    "rule_20260113200456": {
-      "usage_count": 7,
-      "success_count": 1
-    },
-    "rule_20260114170135": {
-      "usage_count": 12,
-      "success_count": 8
-    },
-    "rule_20260114175505": {
-      "usage_count": 12,
-      "success_count": 7
-    },
-    "rule_20260114175741": {
-      "usage_count": 14,
-      "success_count": 9
-    },
-    "rule_20260114175830": {
-      "usage_count": 11,
-      "success_count": 7
-    },
-    "rule_20260114180014": {
-      "usage_count": 14,
-      "success_count": 7
-    },
-    "rule_20260114180042": {
-      "usage_count": 17,
-      "success_count": 13
-    },
-    "rule_20260114180155": {
-      "usage_count": 13,
-      "success_count": 8
-    },
-    "rule_20260114180307": {
-      "usage_count": 8,
-      "success_count": 3
-    },
-    "rule_20260114180418": {
-      "usage_count": 10,
-      "success_count": 6
-    },
-    "rule_20260114180824": {
-      "usage_count": 14,
-      "success_count": 5
-    },
-    "rule_20260114181109": {
-      "usage_count": 7,
-      "success_count": 2
-    },
-    "rule_20260114181556": {
-      "usage_count": 13,
-      "success_count": 9
-    },
-    "rule_20260114181729": {
-      "usage_count": 12,
-      "success_count": 7
-    },
-    "rule_20260114181939": {
-      "usage_count": 8,
-      "success_count": 3
-    },
-    "rule_20260114182133": {
-      "usage_count": 14,
-      "success_count": 12
-    },
-    "rule_20260114182341": {
-      "usage_count": 34,
-      "success_count": 24
-    },
-    "rule_20260114182527": {
-      "usage_count": 16,
-      "success_count": 7
-    },
-    "rule_20260114182607": {
-      "usage_count": 15,
-      "success_count": 10
-    },
-    "rule_20260114182754": {
-      "usage_count": 11,
-      "success_count": 7
-    },
-    "rule_20260114182837": {
-      "usage_count": 14,
-      "success_count": 9
-    },
-    "rule_20260114182912": {
-      "usage_count": 8,
-      "success_count": 3
-    },
-    "rule_20260114183112": {
-      "usage_count": 13,
-      "success_count": 5
-    },
-    "rule_20260114183556": {
-      "usage_count": 14,
-      "success_count": 5
-    },
-    "rule_20260114183639": {
-      "usage_count": 15,
-      "success_count": 10
-    },
-    "rule_20260114183930": {
-      "usage_count": 12,
-      "success_count": 8
-    },
-    "rule_20260114184135": {
+    "rule_20260115064936": {
       "usage_count": 22,
+      "success_count": 8
+    },
+    "rule_20260115065708": {
+      "usage_count": 30,
+      "success_count": 9
+    },
+    "rule_20260115065924": {
+      "usage_count": 32,
+      "success_count": 15
+    },
+    "rule_20260115070320": {
+      "usage_count": 42,
+      "success_count": 20
+    },
+    "rule_20260115071523": {
+      "usage_count": 52,
+      "success_count": 20
+    },
+    "rule_20260115073452": {
+      "usage_count": 58,
+      "success_count": 32
+    },
+    "rule_20260115074006": {
+      "usage_count": 39,
       "success_count": 16
     },
-    "rule_20260114184255": {
-      "usage_count": 15,
+    "rule_20260115074904": {
+      "usage_count": 40,
+      "success_count": 10
+    },
+    "rule_20260115075629": {
+      "usage_count": 34,
+      "success_count": 17
+    },
+    "rule_20260115182229": {
+      "usage_count": 7,
+      "success_count": 2
+    },
+    "rule_20260115184246": {
+      "usage_count": 28,
       "success_count": 11
     },
-    "rule_20260114184340": {
-      "usage_count": 10,
-      "success_count": 5
-    },
-    "rule_20260114184433": {
-      "usage_count": 13,
+    "rule_20260115185638": {
+      "usage_count": 24,
       "success_count": 8
     },
-    "rule_20260114184841": {
-      "usage_count": 20,
-      "success_count": 16
-    },
-    "rule_20260114184913": {
-      "usage_count": 10,
+    "rule_20260115191139": {
+      "usage_count": 16,
       "success_count": 6
     },
-    "rule_20260114185121": {
+    "rule_20260115192335": {
+      "usage_count": 16,
+      "success_count": 5
+    },
+    "rule_20260115192710": {
       "usage_count": 13,
       "success_count": 5
     },
-    "rule_20260114185323": {
-      "usage_count": 11,
-      "success_count": 7
-    },
-    "rule_20260114185458": {
-      "usage_count": 10,
-      "success_count": 4
-    },
-    "rule_20260114185537": {
-      "usage_count": 11,
-      "success_count": 7
-    },
-    "rule_20260114224539": {
-      "usage_count": 13,
-      "success_count": 7
-    },
-    "rule_20260114225131": {
-      "usage_count": 11,
-      "success_count": 6
-    },
-    "rule_20260114230706": {
+    "rule_20260115193612": {
       "usage_count": 12,
-      "success_count": 7
+      "success_count": 5
     },
-    "rule_20260114235342": {
+    "rule_20260115194138": {
       "usage_count": 7,
-      "success_count": 2
-    },
-    "rule_20260115000132": {
-      "usage_count": 12,
-      "success_count": 5
+      "success_count": 3
     }
   }
 }
