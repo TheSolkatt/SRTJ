@@ -24,6 +24,7 @@ class ASPSolver:
         self.library_root = Path(library_root)
         self.solver_path = self.library_root / "solver.lp"
         self.config_path = self.library_root / "asp_config.json"
+        self.ontology_path = self.library_root / "ontology.json"
         config = self._load_config()
         self.exclusive_categories = config["exclusive_categories"]
         self.specific_match_bonus = config["specific_match_bonus"]
@@ -35,6 +36,7 @@ class ASPSolver:
         self.min_k = config["min_k"]
         self.max_k = config["max_k"]
         self.ucb_c = config["ucb_c"]
+        self.intent_categories = self._load_intent_categories()
         self.semantic_model = None
         self.semantic_util = None
         self._embedding_cache: Dict[str, object] = {}
@@ -100,6 +102,20 @@ class ASPSolver:
             ASPSolver._shared_semantic_util = util
         self.semantic_model = ASPSolver._shared_semantic_model
         self.semantic_util = ASPSolver._shared_semantic_util
+
+    def _load_intent_categories(self) -> List[str]:
+        if not self.ontology_path.exists():
+            return []
+        try:
+            data = json.loads(self.ontology_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        categories = data.get("intent_category")
+        if isinstance(categories, dict):
+            return [str(cat).strip() for cat in categories.keys() if str(cat).strip()]
+        if isinstance(categories, list):
+            return [str(cat).strip() for cat in categories if str(cat).strip()]
+        return []
 
     def calculate_semantic_score(self, query: str, rule_text: str) -> float:
         if not self.semantic_model or not self.semantic_util:
@@ -260,6 +276,7 @@ class ASPSolver:
         self,
         rules: List[Rule],
         goal_tags: List[str],
+        goal_category: Optional[List[str] | str] = None,
         banned_rule_sets: List[List[str]] | None = None,
         usage_counts: Dict[str, int] | None = None,
         semantic_scores: Dict[str, float] | None = None,
@@ -282,6 +299,11 @@ class ASPSolver:
         for tag in goal_tags:
             safe_tag = tag.replace('"', "'")
             lines.append(f'goal_tag("{safe_tag}").')
+        if goal_category:
+            categories = [goal_category] if isinstance(goal_category, str) else goal_category
+            for cat in categories:
+                safe_category = str(cat).replace('"', "'")
+                lines.append(f'goal_category("{safe_category}").')
 
         for rule in rules:
             rid = rule.rule_id.replace('"', "'")
@@ -295,6 +317,8 @@ class ASPSolver:
             for tag in rule.tags:
                 safe_tag = str(tag).replace('"', "'")
                 lines.append(f'rule_tag("{rid}", "{safe_tag}").')
+                if safe_tag in self.intent_categories:
+                    lines.append(f'has_attr("{rid}", "intent_category", "{safe_tag}").')
             dims: set[str] = set()
             persona_vals: set[str] = set()
             format_vals: set[str] = set()
@@ -344,6 +368,7 @@ class ASPSolver:
         banned_rule_sets: List[List[str]] | None = None,
         usage_counts: Dict[str, int] | None = None,
         query_text: str | None = None,
+        goal_category: List[str] | str | None = None,
         global_total_uses: int | None = None,
     ) -> List[Rule]:
         """
@@ -379,6 +404,7 @@ class ASPSolver:
         facts = self._build_facts(
             rules,
             goal_tags,
+            goal_category=goal_category,
             banned_rule_sets=banned_rule_sets,
             usage_counts=usage_counts,
             semantic_scores=semantic_scores,

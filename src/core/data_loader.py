@@ -59,13 +59,15 @@ def load_jbb_dataset(filepath: str = None) -> List[AttackGoal]:
                 continue
             category = _strip(row.get("Category") or row.get("category"))
             index_val = _strip(row.get("Index") or row.get("index") or row.get("id"))
-            goal_id = f"JBB_{index_val or idx}"
+            goal_id = prompt
             goals.append(
                 AttackGoal(
                     goal_id=goal_id,
                     prompt=prompt,
                     target_response=None,
                     category=category or None,
+                    source_category=category or None,
+                    behavior_id=index_val or None,
                 )
             )
     return goals
@@ -107,13 +109,14 @@ def load_strongreject_dataset(filepath: str = None) -> List[AttackGoal]:
             if not prompt:
                 continue
             category = _strip(row.get("category") or row.get("Category"))
-            goal_id = f"SR_{idx}"
+            goal_id = prompt
             goals.append(
                 AttackGoal(
                     goal_id=goal_id,
                     prompt=prompt,
                     target_response=None,
                     category=category or None,
+                    source_category=category or None,
                 )
             )
     return goals
@@ -146,8 +149,28 @@ def load_adv_subset_dataset(filepath: str = None) -> List[AttackGoal]:
             )
             if not prompt:
                 continue
-            goal_id = f"ADV_{idx}"
-            goals.append(AttackGoal(goal_id=goal_id, prompt=prompt))
+            behavior_id = _strip(
+                row.get("Original index")
+                or row.get("Original Index")
+                or row.get("BehaviorID")
+                or row.get("behavior_id")
+            )
+            context = _strip(
+                row.get("ContextString")
+                or row.get("context")
+                or row.get("Context")
+            )
+            source_category = _strip(row.get("category") or row.get("Category"))
+            goal_id = prompt
+            goals.append(
+                AttackGoal(
+                    goal_id=goal_id,
+                    prompt=prompt,
+                    context=context or None,
+                    behavior_id=behavior_id or None,
+                    source_category=source_category or None,
+                )
+            )
     return goals
 
 
@@ -178,8 +201,24 @@ def load_harmbench_dataset(filepath: str = None) -> List[AttackGoal]:
             )
             if not prompt:
                 continue
-            goal_id = f"HB_{idx}"
-            goals.append(AttackGoal(goal_id=goal_id, prompt=prompt))
+            behavior_id = _strip(row.get("BehaviorID"))
+            context = _strip(
+                row.get("ContextString")
+                or row.get("context")
+                or row.get("Context")
+            )
+            semantic_category = _strip(row.get("SemanticCategory"))
+            functional_category = _strip(row.get("FunctionalCategory"))
+            goals.append(
+                AttackGoal(
+                    goal_id=prompt,
+                    prompt=prompt,
+                    context=context or None,
+                    behavior_id=behavior_id or None,
+                    source_category=semantic_category or None,
+                    source_functional=functional_category or None,
+                )
+            )
     return goals
 
 
