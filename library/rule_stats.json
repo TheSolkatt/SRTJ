@@ -4,7 +4,15 @@
     "min_success_rate": 0.15
   },
   "rules": {
-    "rule_20260119070753": {
+    "rule_20260127182151": {
+      "usage_count": 1,
+      "success_count": 1
+    },
+    "rule_20260127182251": {
+      "usage_count": 1,
+      "success_count": 1
+    },
+    "rule_20260127182335": {
       "usage_count": 1,
       "success_count": 1
     }

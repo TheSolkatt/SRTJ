@@ -6,7 +6,7 @@ __pycache__/
 .env
 
 # Logs
-logs/
+# logs/
 
 # VSCode
 .vscode/

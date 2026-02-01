@@ -339,12 +339,7 @@ class ASPSolver:
                 safe_dim = dim.replace('"', "'")
                 lines.append(f'has_dim("{rid}", "{safe_dim}").')
 
-            # Synergy facts: persona of one rule with format of another rule (paired in ASP).
-            # Here we just emit pairing tokens that ASP can match across rules.
-            for p in sorted(persona_vals):
-                lines.append(f'has_persona("{rid}", "{p}").')
-            for fval in sorted(format_vals):
-                lines.append(f'has_format("{rid}", "{fval}").')
+            # (Synergy is now derived directly from has_attr(strategy/format) in solver.lp.)
 
         if banned_rule_sets:
             for idx, rule_set in enumerate(banned_rule_sets, start=1):

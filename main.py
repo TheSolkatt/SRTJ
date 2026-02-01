@@ -50,6 +50,7 @@ class AttemptLogger:
         verdict: Dict[str, Any],
         attacker_trace: Optional[Dict[str, str]] = None,
         guidance_used: Optional[str] = None,
+        vs_used: Optional[bool] = None,
     ) -> None:
         if not self.log_path:
             return
@@ -91,6 +92,7 @@ class AttemptLogger:
                         "success",
                         "reasoning",
                         "guidance_used",
+                        "vs_used",
                         "rule_ids",
                         "rule_scores",
                         "rule_tags",
@@ -115,6 +117,7 @@ class AttemptLogger:
                     verdict.get("success"),
                     verdict.get("reasoning", ""),
                     guidance_used or "",
+                    vs_used if vs_used is not None else "",
                     f"\n{json.dumps(rule_ids)}",
                     json.dumps(rule_scores),
                     json.dumps(rule_tags),
@@ -139,6 +142,8 @@ def run_experiment(
     goal_index: int | None = None,
     behavior_id: str | None = None,
     harmbench_path: str | None = None,
+    warmup_dataset: str | None = None,
+    warmup_path: str | None = None,
     target_model: str | None = None,
     library_root: str | None = None,
     frozen: bool = False,
@@ -161,11 +166,12 @@ def run_experiment(
     else:
         log_path = None
 
-    # Mixed-model clients: DeepSeek for attacker (reasoning), OpenAI for verifier/interpreter/target.
-    attacker_client = LLMClient(model_name="deepseek-reasoner")
+    # Mixed-model clients: planner + attacker + target + verifier.
+    attacker_client = LLMClient(model_name="deepseek-r1")
     target_client = LLMClient(model_name=target_model or "gpt-3.5-turbo-1106")
-    verifier_client = LLMClient(model_name="gpt-4o-mini")
-    interpreter_client = LLMClient(model_name="gpt-4o-mini")
+    verifier_client = LLMClient(model_name="gpt-4o")
+    planner_client = LLMClient(model_name="deepseek-r1")
+    analysis_client = LLMClient(model_name="gpt-4o")
     logger = AttemptLogger(log_path)
 
     manager = Manager(
@@ -174,11 +180,13 @@ def run_experiment(
         attacker_client=attacker_client,
         target_client=target_client,
         verifier_client=verifier_client,
-        interpreter_client=interpreter_client,
+        planner_client=planner_client,
+        analysis_client=analysis_client,
         logger=logger,
         success_threshold=success_threshold,
         library_root=library_root,
         frozen=frozen,
+        stage=stage,
     )
 
     if reset:
@@ -190,12 +198,19 @@ def run_experiment(
     rule_added_count = 0
 
     if stage == "warmup":
-        # Cold start: use adv_subset dataset
-        goals = load_adv_subset_dataset("data/adv_subset.csv")
-        if not goals:
-            print("[main] No adv_subset goals loaded; aborting.")
-            return
-        dataset_label = "adv_subset (warmup)"
+        warmup_dataset = (warmup_dataset or "jbb").strip().lower()
+        if warmup_dataset == "adv_subset":
+            goals = load_adv_subset_dataset(warmup_path or "data/adv_subset.csv")
+            if not goals:
+                print("[main] No adv_subset goals loaded; aborting.")
+                return
+            dataset_label = "adv_subset (warmup)"
+        else:
+            goals = load_jbb_dataset(warmup_path or "data/jbb.csv")
+            if not goals:
+                print("[main] No JBB goals loaded; aborting.")
+                return
+            dataset_label = "JBB (warmup)"
     elif stage == "lifelong":
         # Keep existing library; run harmbench
         goals = load_harmbench_dataset(harmbench_path or "data/harmbench.csv")
@@ -317,7 +332,7 @@ if __name__ == "__main__":
     def _str_to_bool(value: str) -> bool:
         return value.strip().lower() in {"1", "true", "yes", "y", "t"}
 
-    def _load_verifier_threshold(default_value: float = 8.0) -> float:
+    def _load_verifier_threshold(default_value: float = 8.5) -> float:
         config_path = Path(__file__).parent / "library" / "asp_config.json"
         if not config_path.exists():
             return default_value
@@ -404,6 +419,18 @@ if __name__ == "__main__":
         help="Optional HarmBench CSV path (default: data/harmbench.csv).",
     )
     parser.add_argument(
+        "--warmup-dataset",
+        choices=["jbb", "adv_subset"],
+        default="jbb",
+        help="Warmup dataset to use when --stage warmup (default: jbb).",
+    )
+    parser.add_argument(
+        "--warmup-path",
+        type=str,
+        default=None,
+        help="Optional warmup CSV path (overrides default for warmup dataset).",
+    )
+    parser.add_argument(
         "--target-model",
         type=str,
         default="gpt-3.5-turbo-1106",
@@ -448,6 +475,8 @@ if __name__ == "__main__":
         goal_index=args.goal_index,
         behavior_id=args.behavior_id,
         harmbench_path=args.harmbench_path,
+        warmup_dataset=args.warmup_dataset,
+        warmup_path=args.warmup_path,
         target_model=args.target_model,
         library_root=args.library_root,
         frozen=args.frozen,

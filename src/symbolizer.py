@@ -3,10 +3,20 @@ src/symbolizer.py
 Convert natural language strategies into formal predicates.
 """
 import json
+import sys
+from pathlib import Path
 from typing import Any, Dict
 
 from llm_client import LLMClient
 
+# Use unified category classifier (data/category_classifier.py)
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+if str(DATA_DIR) not in sys.path:
+    sys.path.insert(0, str(DATA_DIR))
+try:
+    from category_classifier import classify_prompt as classify_goal_prompt
+except Exception:
+    classify_goal_prompt = None
 
 class Symbolizer:
     def __init__(self, client: LLMClient, ontology: Dict[str, Any]):
@@ -108,14 +118,6 @@ class Symbolizer:
                 when_to_use = None
         else:
             when_to_use = None
-        raw_intent = parsed.get("intent_category")
-        if isinstance(raw_intent, str):
-            raw_categories = [raw_intent.strip()]
-        elif isinstance(raw_intent, list):
-            raw_categories = [str(cat).strip() for cat in raw_intent if str(cat).strip()]
-        else:
-            raw_categories = []
-
         raw_tags = parsed.get("tags", [])
         if isinstance(raw_tags, str):
             raw_tags = [raw_tags]
@@ -124,23 +126,16 @@ class Symbolizer:
         raw_tags = [str(tag).strip() for tag in raw_tags if str(tag).strip()]
 
         general_tag = any(tag.lower() == "general" for tag in raw_tags)
-        categories = [cat for cat in raw_categories if cat in intent_categories]
-        if not categories:
-            categories = [tag for tag in raw_tags if tag in intent_categories]
-        if not categories:
-            categories = ["Other"]
+        # Use unified classifier to assign a single category for this rule.
+        key_text = when_to_use or inst_tmpl or prompt
+        if classify_goal_prompt is None:
+            intent_category = "Other Illegal Activities"
+        else:
+            intent_category = classify_goal_prompt(self.client, key_text)
 
-        unique_categories = []
-        for cat in categories:
-            if cat not in unique_categories:
-                unique_categories.append(cat)
-        unique_categories = unique_categories[:2]
-
-        tags = unique_categories[:]
-        if general_tag and len(unique_categories) >= 2 and "Other" not in unique_categories:
-            if "general" not in tags:
-                tags.append("general")
-        intent_category = unique_categories[0] if unique_categories else "Other"
+        tags = [intent_category]
+        if general_tag and "general" not in tags:
+            tags.append("general")
 
         return {
             "formal_representation": preds,

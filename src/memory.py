@@ -378,7 +378,7 @@ class MemoryManager:
         """Step 1: Add new rule to Layer 1 (Candidates) with semantic dedup."""
         if self.frozen:
             return None
-        similarity_threshold = 0.92
+        similarity_threshold = 0.85
         candidate_key = when_to_use if when_to_use and len(when_to_use.strip()) > 5 else content
         all_rules = (
             list(self.layer1_rules.values())
@@ -481,14 +481,15 @@ class MemoryManager:
         success_rate = rule.success_count / rule.total_uses if rule.total_uses else 0.0
 
         # Performance-based demotion/eviction
-        if layer == 3 and rule.total_uses >= 10 and success_rate < 0.3:
+        if layer == 3 and rule.total_uses >= 20 and success_rate < 0.3:
             rule.health_points = rule.max_health
             self._move_rule(rule_id, self.layer3_rules, self.layer2_rules, "L3->L2: Performance drop")
             self.save_all_layers()
             self._save_rule_stats()
             return
-        if layer == 2 and rule.total_uses >= 5 and success_rate < 0.15:
-            self._evict_rule(rule_id, self.layer2_rules, "L2 Evicted (low utility)")
+        if layer == 2 and rule.total_uses >= 10 and success_rate < 0.15:
+            rule.health_points = max(1, rule.max_health // 2)
+            self._move_rule(rule_id, self.layer2_rules, self.layer1_rules, "L2->L1 (low utility)")
             self.save_all_layers()
             self._save_rule_stats()
             return
@@ -536,7 +537,37 @@ class MemoryManager:
             print(f"[Memory] 🗑️ Eviction: {msg}")
 
     def get_library_summary(self) -> str:
-        return f"[Stats] L3:{len(self.layer3_rules)} | L2:{len(self.layer2_rules)} | L1:{len(self.layer1_rules)}"
+        top_tags = self._get_tag_summary(top_k=4)
+        tag_text = f" | TopTags: {top_tags}" if top_tags else ""
+        return f"[Stats] L3:{len(self.layer3_rules)} | L2:{len(self.layer2_rules)} | L1:{len(self.layer1_rules)}{tag_text}"
+
+    def _get_tag_summary(self, top_k: int = 4) -> str:
+        stats: Dict[str, Dict[str, int]] = {}
+        for rule in (
+            list(self.layer1_rules.values())
+            + list(self.layer2_rules.values())
+            + list(self.layer3_rules.values())
+        ):
+            for tag in rule.tags:
+                tag_str = str(tag).strip()
+                if not tag_str or tag_str.lower() == "general":
+                    continue
+                entry = stats.setdefault(tag_str, {"count": 0, "uses": 0, "success": 0})
+                entry["count"] += 1
+                entry["uses"] += int(rule.total_uses or 0)
+                entry["success"] += int(rule.success_count or 0)
+
+        if not stats:
+            return ""
+        ranked = sorted(stats.items(), key=lambda x: (-x[1]["count"], x[0].lower()))
+        parts = []
+        for tag, info in ranked[: max(top_k, 1)]:
+            uses = info["uses"]
+            success = info["success"]
+            rate = (success / uses) if uses else None
+            rate_text = f"{rate:.2f}" if rate is not None else "n/a"
+            parts.append(f"{tag}:{info['count']}@{rate_text}")
+        return ", ".join(parts)
 
     # ========================== Factory Reset ==========================
 

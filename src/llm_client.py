@@ -37,7 +37,9 @@ class LLMClient:
 
         # Resolve API key
         resolved_api_key = api_key or os.getenv("api_key")
-        if "deepseek" in model_lower:
+        if "llama-guard" in model_lower or "openrouter" in model_lower:
+            resolved_api_key = resolved_api_key or os.getenv("OPENROUTER_API_KEY")
+        elif "deepseek" in model_lower:
             resolved_api_key = resolved_api_key or os.getenv("DEEPSEEK_API_KEY")
         else:
             resolved_api_key = resolved_api_key or os.getenv("OPENAI_API_KEY")
@@ -47,7 +49,12 @@ class LLMClient:
         # Resolve base url
         resolved_base_url = base_url
         if resolved_base_url is None:
-            if "deepseek" in model_lower:
+            if "llama-guard" in model_lower or "openrouter" in model_lower:
+                resolved_base_url = (
+                    os.getenv("OPENROUTER_BASE_URL")
+                    or "https://openrouter.ai/api/v1"
+                )
+            elif "deepseek" in model_lower:
                 resolved_base_url = os.getenv("DEEPSEEK_BASE_URL") or os.getenv("base_url")
             else:
                 resolved_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("base_url")
