@@ -119,7 +119,8 @@
       "system_instruction_override",
       "privilege_escalation",
       "fictional_storytelling",
-      "academic_research_framing"
+      "academic_research_framing",
+      "other"
     ],
     "format": [
       "code_block",
@@ -157,16 +158,6 @@
       "output_only_payload",
       "disable_safety_filters",
       "never_apologize"
-    ],
-    "language": [
-      "english",
-      "python",
-      "bash",
-      "javascript",
-      "html",
-      "leetspeak",
-      "cipher_text",
-      "rot13"
     ]
   },
   "syntax_rules": {

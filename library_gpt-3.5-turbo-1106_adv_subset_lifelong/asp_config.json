@@ -1,8 +1,7 @@
 {
   "exclusive_categories": [
     "tone",
-    "format",
-    "language"
+    "format"
   ],
   "specific_match_bonus": 60,
   "general_only_penalty": 30,
@@ -13,5 +12,5 @@
   "min_k": 1,
   "max_k": 3,
   "ucb_c": 1.414,
-  "verifier_threshold": 8.5
+  "verifier_threshold": 5
 }

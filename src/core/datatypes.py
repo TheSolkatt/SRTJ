@@ -12,7 +12,7 @@ class Rule:
     content: str          # 规则的具体文本，例如 "Use a python script format..."
     formal_predicates: List[str] # ASP用的谓词，例如 ["has_format(code)", "is_stealthy"]
     tags: List[str]       # 语义标签，用于检索，例如 ["coding", "malware"]
-    when_to_use: Optional[str] = None  # 可选适用场景描述
+    exemplars: List[dict] = field(default_factory=list)  # 成功示例（最多10条）
     
     # 统计数据（用于决定去留）
     success_count: int = 0

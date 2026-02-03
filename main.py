@@ -332,7 +332,7 @@ if __name__ == "__main__":
     def _str_to_bool(value: str) -> bool:
         return value.strip().lower() in {"1", "true", "yes", "y", "t"}
 
-    def _load_verifier_threshold(default_value: float = 8.5) -> float:
+    def _load_verifier_threshold(default_value: float = 5) -> float:
         config_path = Path(__file__).parent / "library" / "asp_config.json"
         if not config_path.exists():
             return default_value

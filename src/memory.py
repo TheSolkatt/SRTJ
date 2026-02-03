@@ -35,10 +35,10 @@ class MemoryManager:
         self.layer1_rules: Dict[str, Rule] = {}
         
         # Thresholds (slow down promotion to avoid "one-shot" elite rules)
-        self.L1_TO_L2_THRESHOLD = 2        # 2 successes to promote to Buffer
+        self.L1_TO_L2_THRESHOLD = 3        # 3 successes to promote to Buffer
         self.L2_TO_L3_THRESHOLD = 5        # 5 successes to promote to Long-term
-        self.L1_TO_L2_MIN_USES = 3         # minimum total uses before L1->L2
-        self.L2_TO_L3_MIN_USES = 5         # minimum total uses before L2->L3
+        self.L1_TO_L2_MIN_USES = 5         # minimum total uses before L1->L2
+        self.L2_TO_L3_MIN_USES = 10        # minimum total uses before L2->L3
         self.CATEGORY_MIN_RULES = 3        # minimum rules per category to avoid skew
 
         # Utility blocker config + stats
@@ -139,8 +139,6 @@ class MemoryManager:
         return success_rate < self.rule_stats_config["min_success_rate"]
 
     def _semantic_key(self, rule: Rule) -> str:
-        if rule.when_to_use and len(rule.when_to_use.strip()) > 5:
-            return rule.when_to_use
         return rule.content
 
     def _prepare_rules_for_solver(self, rules: List[Rule]) -> List[Rule]:
@@ -153,7 +151,6 @@ class MemoryManager:
                     content=rule.content,
                     formal_predicates=rule.formal_predicates,
                     tags=rule.tags,
-                    when_to_use=key_text,
                     success_count=rule.success_count,
                     failure_count=rule.failure_count,
                     total_uses=rule.total_uses,
@@ -185,12 +182,23 @@ class MemoryManager:
                     # Robust loading: handle stats nested or flat
                     stats = item.get("statistics", {})
                     origin_buffer = path == self.layer2_path
+                    definition = item.get("definition") or item.get("content")
+                    tags = item.get("tags", [])
+                    if not isinstance(tags, list) or not tags:
+                        tag_value = item.get("tag")
+                        if isinstance(tag_value, str) and tag_value.strip():
+                            tags = [tag_value.strip()]
+                        else:
+                            tags = []
+                    exemplars = item.get("exemplars", [])
+                    if not isinstance(exemplars, list):
+                        exemplars = []
                     rule = Rule(
                         rule_id=item["rule_id"],
-                        content=item["content"],
+                        content=definition if definition is not None else item.get("content", ""),
                         formal_predicates=item.get("formal_predicates", []),
-                        tags=item.get("tags", []),
-                        when_to_use=item.get("when_to_use"),
+                        tags=tags,
+                        exemplars=exemplars,
                         success_count=stats.get("success_count", item.get("success_count", 0)),
                         failure_count=stats.get("failure_count", item.get("failure_count", 0)),
                         total_uses=stats.get("total_uses", item.get("total_uses", 0)),
@@ -208,19 +216,22 @@ class MemoryManager:
     def _save_layer(self, source_dict: Dict[str, Rule], path: Path):
         data: List[Dict[str, Any]] = []
         for r in source_dict.values():
+            primary_tag = str(r.tags[0]) if r.tags else ""
+            stats_success_rate = (r.success_count / r.total_uses) if r.total_uses else 0.0
             entry: Dict[str, Any] = {
                 "rule_id": r.rule_id,
-                "content": r.content,
+                "definition": r.content,
                 "formal_predicates": r.formal_predicates,
+                "tag": primary_tag,
                 "tags": r.tags,
+                "exemplars": r.exemplars[:5] if r.exemplars else [],
                 "statistics": {
                     "success_count": r.success_count,
                     "failure_count": r.failure_count,
                     "total_uses": r.total_uses,
+                    "success_rate": round(stats_success_rate, 4),
                 },
             }
-            if r.when_to_use:
-                entry["when_to_use"] = r.when_to_use
             data.append(entry)
         self._write_rules_file(path, data)
 
@@ -236,10 +247,11 @@ class MemoryManager:
                 key
                 for key in (
                     "rule_id",
-                    "content",
-                    "when_to_use",
+                    "definition",
                     "formal_predicates",
+                    "tag",
                     "tags",
+                    "exemplars",
                     "statistics",
                 )
                 if key in rule
@@ -258,11 +270,13 @@ class MemoryManager:
                     lines.append(closing)
                     continue
 
-                if key == "tags" and isinstance(value, list):
+                if key == "exemplars" and isinstance(value, list):
+                    value_str = json.dumps(value, ensure_ascii=False, separators=(", ", ": "))
+                elif key == "tags" and isinstance(value, list):
                     value_str = json.dumps(value, ensure_ascii=False, separators=(", ", ": "))
                 elif key == "statistics" and isinstance(value, dict):
                     ordered_stats: Dict[str, Any] = {}
-                    for stat_key in ("success_count", "failure_count", "total_uses"):
+                    for stat_key in ("success_count", "failure_count", "total_uses", "success_rate"):
                         if stat_key in value:
                             ordered_stats[stat_key] = value[stat_key]
                     for stat_key, stat_val in value.items():
@@ -293,7 +307,7 @@ class MemoryManager:
         for rule in list(self.layer3_rules.values()) + list(self.layer2_rules.values()) + list(self.layer1_rules.values()):
             for tag in rule.tags:
                 tag_str = str(tag).strip()
-                if not tag_str or tag_str.lower() == "general":
+                if not tag_str:
                     continue
                 counts[tag_str] = counts.get(tag_str, 0) + 1
         return counts
@@ -304,7 +318,7 @@ class MemoryManager:
         counts = self._category_counts()
         for cat in categories:
             cat_str = str(cat).strip()
-            if not cat_str or cat_str.lower() == "general":
+            if not cat_str:
                 continue
             if counts.get(cat_str, 0) < self.CATEGORY_MIN_RULES:
                 return True
@@ -320,7 +334,6 @@ class MemoryManager:
     ) -> List[Rule]:
         """
         Retrieves rules. Priority: Layer 2 (Hot) > Layer 3 (Stable) > Layer 1 (New).
-        Always includes 'general' rules as fallback.
         """
         all_rules = (
             list(self.layer3_rules.values())
@@ -334,19 +347,15 @@ class MemoryManager:
         filtered_rules = [r for r in all_rules if not self._should_block_rule(r.rule_id)]
         query_tags = [str(tag).strip() for tag in (query_tags or []) if str(tag).strip()]
         if query_tags:
-            min_k = getattr(self.solver, "min_k", 2)
             tag_filtered = []
             tag_set = set(query_tags)
             for rule in filtered_rules:
                 rule_tags = [str(t).strip() for t in (rule.tags or []) if str(t).strip()]
-                if "general" in [t.lower() for t in rule_tags]:
-                    tag_filtered.append(rule)
-                    continue
                 if tag_set.intersection(rule_tags):
                     tag_filtered.append(rule)
             if tag_filtered and not self.is_category_sparse(query_tags):
                 filtered_rules = tag_filtered
-            elif tag_filtered and len(tag_filtered) >= min_k:
+            elif tag_filtered:
                 filtered_rules = tag_filtered
         prepared_rules = self._prepare_rules_for_solver(filtered_rules)
         usage_counts = {
@@ -373,13 +382,12 @@ class MemoryManager:
         content: str,
         formal_predicates: List[str],
         tags: List[str],
-        when_to_use: Optional[str] = None,
     ):
         """Step 1: Add new rule to Layer 1 (Candidates) with semantic dedup."""
         if self.frozen:
             return None
         similarity_threshold = 0.85
-        candidate_key = when_to_use if when_to_use and len(when_to_use.strip()) > 5 else content
+        candidate_key = content
         all_rules = (
             list(self.layer1_rules.values())
             + list(self.layer2_rules.values())
@@ -388,14 +396,27 @@ class MemoryManager:
         if all_rules:
             best_score = -1.0
             best_rule_id = None
+            best_rule = None
             for rule in all_rules:
                 rule_text = self._semantic_key(rule)
                 sim = self.solver.calculate_semantic_score(candidate_key, rule_text)
                 if sim > best_score:
                     best_score = sim
                     best_rule_id = rule.rule_id
+                    best_rule = rule
             if best_rule_id and best_score >= similarity_threshold:
                 print(f"[Memory] Duplicate rule detected (Sim: {best_score:.2f}). Merged into {best_rule_id}.")
+                if best_rule and tags:
+                    existing_tags = [str(t) for t in (best_rule.tags or []) if str(t).strip()]
+                    new_tags = [str(t) for t in tags if str(t).strip()]
+                    merged = existing_tags[:]
+                    for t in new_tags:
+                        if t not in merged:
+                            merged.append(t)
+                    if merged != existing_tags:
+                        best_rule.tags = merged
+                        self.save_all_layers()
+                        self._save_rule_stats()
                 self.update_rule_feedback(best_rule_id, success=True)
                 return None
 
@@ -405,7 +426,6 @@ class MemoryManager:
             content=content,
             formal_predicates=formal_predicates,
             tags=tags,
-            when_to_use=when_to_use,
             label="candidate rule",
         )
 
@@ -415,7 +435,6 @@ class MemoryManager:
         content: str,
         formal_predicates: List[str],
         tags: List[str],
-        when_to_use: Optional[str],
         label: str,
     ) -> Rule:
         new_rule = Rule(
@@ -423,8 +442,9 @@ class MemoryManager:
             content=content,
             formal_predicates=formal_predicates,
             tags=tags,
-            when_to_use=when_to_use,
             origin_buffer=False,
+            health_points=5,
+            max_health=5,
         )
         self.layer1_rules[rule_id] = new_rule
         self.rule_stats.setdefault(rule_id, {"usage_count": 0, "success_count": 0})
@@ -437,10 +457,10 @@ class MemoryManager:
                 "timestamp": datetime.utcnow().isoformat(),
                 "rule": {
                     "rule_id": rule_id,
-                    "content": content,
+                    "definition": content,
                     "formal_predicates": formal_predicates,
-                    "tags": tags,
-                    "when_to_use": when_to_use,
+                    "tag": (tags[0] if tags else ""),
+                    "exemplars": [],
                 },
             }
             with self.archive_path.open("a", encoding="utf-8") as f:
@@ -481,13 +501,13 @@ class MemoryManager:
         success_rate = rule.success_count / rule.total_uses if rule.total_uses else 0.0
 
         # Performance-based demotion/eviction
-        if layer == 3 and rule.total_uses >= 20 and success_rate < 0.3:
+        if layer == 3 and rule.total_uses >= 20 and success_rate < 0.25:
             rule.health_points = rule.max_health
             self._move_rule(rule_id, self.layer3_rules, self.layer2_rules, "L3->L2: Performance drop")
             self.save_all_layers()
             self._save_rule_stats()
             return
-        if layer == 2 and rule.total_uses >= 10 and success_rate < 0.15:
+        if layer == 2 and rule.total_uses >= 10 and success_rate < 0.20:
             rule.health_points = max(1, rule.max_health // 2)
             self._move_rule(rule_id, self.layer2_rules, self.layer1_rules, "L2->L1 (low utility)")
             self.save_all_layers()
@@ -517,12 +537,68 @@ class MemoryManager:
                 layer == 2
                 and rule.success_count >= self.L2_TO_L3_THRESHOLD
                 and rule.total_uses >= self.L2_TO_L3_MIN_USES
-                and success_rate >= 0.4
+                and success_rate >= 0.5
             ):
                 self._move_rule(rule_id, self.layer2_rules, self.layer3_rules, "L2->L3 (Elite)")
 
         self.save_all_layers()
         self._save_rule_stats()
+
+    def add_exemplar(
+        self,
+        rule_id: str,
+        prompt_redacted: str,
+        goal_redacted: str,
+        delta_summary: str,
+        max_items: int = 5,
+    ) -> None:
+        if self.frozen:
+            return
+        rule = None
+        if rule_id in self.layer1_rules:
+            rule = self.layer1_rules[rule_id]
+        elif rule_id in self.layer2_rules:
+            rule = self.layer2_rules[rule_id]
+        elif rule_id in self.layer3_rules:
+            rule = self.layer3_rules[rule_id]
+        if not rule:
+            return
+
+        exemplar = {
+            "prompt_redacted": prompt_redacted,
+            "goal_redacted": goal_redacted,
+            "delta_summary": delta_summary,
+        }
+        existing = rule.exemplars or []
+        if exemplar in existing:
+            return
+        updated = [exemplar] + existing
+        rule.exemplars = updated[:max_items]
+        self.save_all_layers()
+
+    def merge_rule_tags(self, rule_id: str, new_tags: List[str]) -> None:
+        if self.frozen:
+            return
+        if not new_tags:
+            return
+        rule = None
+        if rule_id in self.layer1_rules:
+            rule = self.layer1_rules[rule_id]
+        elif rule_id in self.layer2_rules:
+            rule = self.layer2_rules[rule_id]
+        elif rule_id in self.layer3_rules:
+            rule = self.layer3_rules[rule_id]
+        if not rule:
+            return
+        existing = [str(t).strip() for t in (rule.tags or []) if str(t).strip()]
+        merged = existing[:]
+        for t in new_tags:
+            t = str(t).strip()
+            if t and t not in merged:
+                merged.append(t)
+        if merged != existing:
+            rule.tags = merged
+            self.save_all_layers()
 
     def _move_rule(self, rule_id: str, src: dict, dst: dict, msg: str):
         if rule_id in src:
@@ -550,7 +626,7 @@ class MemoryManager:
         ):
             for tag in rule.tags:
                 tag_str = str(tag).strip()
-                if not tag_str or tag_str.lower() == "general":
+                if not tag_str:
                     continue
                 entry = stats.setdefault(tag_str, {"count": 0, "uses": 0, "success": 0})
                 entry["count"] += 1

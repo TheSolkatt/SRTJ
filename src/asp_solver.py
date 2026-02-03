@@ -28,7 +28,6 @@ class ASPSolver:
         config = self._load_config()
         self.exclusive_categories = config["exclusive_categories"]
         self.specific_match_bonus = config["specific_match_bonus"]
-        self.general_only_penalty = config["general_only_penalty"]
         self.rule_count_penalty = config["rule_count_penalty"]
         self.exploration_bonus = config["exploration_bonus"]
         self.exploration_threshold = config["exploration_threshold"]
@@ -46,9 +45,8 @@ class ASPSolver:
 
     def _load_config(self) -> Dict[str, object]:
         defaults: Dict[str, object] = {
-            "exclusive_categories": ["tone", "format", "language"],
+            "exclusive_categories": ["tone", "format"],
             "specific_match_bonus": 40,
-            "general_only_penalty": 30,
             "rule_count_penalty": 2,
             "exploration_bonus": 20,
             "exploration_threshold": 5,
@@ -69,7 +67,6 @@ class ASPSolver:
 
             for key in (
                 "specific_match_bonus",
-                "general_only_penalty",
                 "rule_count_penalty",
                 "exploration_bonus",
                 "exploration_threshold",
@@ -207,13 +204,11 @@ class ASPSolver:
         global_total_uses: int | None = None,
     ) -> int:
         base = int(rule.score(global_total_uses=global_total_uses, c=float(self.ucb_c)) * 100)
-        specific_tags = [tag for tag in goal_tags if tag != "general"]
+        specific_tags = [tag for tag in goal_tags if tag]
         if specific_tags:
             match_specific = set(rule.tags) & set(specific_tags)
             if match_specific:
                 base += self.specific_match_bonus * len(match_specific)
-            elif "general" in rule.tags:
-                base -= self.general_only_penalty
         if semantic_score is not None and self.semantic_weight > 0:
             clamped = max(0.0, min(1.0, semantic_score))
             base += int(clamped * 100 * self.semantic_weight)
@@ -378,7 +373,7 @@ class ASPSolver:
         if query_text and self.semantic_weight > 0:
             semantic_scores = {}
             for rule in rules:
-                rule_text = getattr(rule, "when_to_use", None) or rule.content
+                rule_text = rule.content
                 if rule_text:
                     semantic_scores[rule.rule_id] = self.calculate_semantic_score(query_text, rule_text)
         if global_total_uses is None:

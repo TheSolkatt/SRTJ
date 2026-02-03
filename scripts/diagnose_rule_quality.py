@@ -125,7 +125,12 @@ def _summarize_library(library_root: Path) -> Dict[str, Any]:
             if content in seen_content:
                 duplicates += 1
             seen_content.add(content)
-            rule_tags = r.get("tags") or []
+            rule_tags = r.get("tags")
+            if not rule_tags:
+                tag_value = r.get("tag")
+                rule_tags = [tag_value] if tag_value else []
+            if not isinstance(rule_tags, list):
+                rule_tags = [rule_tags]
             for t in rule_tags:
                 tags[str(t)] += 1
             if "general" in rule_tags:
