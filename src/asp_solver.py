@@ -315,8 +315,6 @@ class ASPSolver:
                 if safe_tag in self.intent_categories:
                     lines.append(f'has_attr("{rid}", "intent_category", "{safe_tag}").')
             dims: set[str] = set()
-            persona_vals: set[str] = set()
-            format_vals: set[str] = set()
             for pred in rule.formal_predicates:
                 dim = self._extract_dimension(pred)
                 if dim:
@@ -325,11 +323,6 @@ class ASPSolver:
                     safe_cat = cat.replace('"', "'")
                     safe_val = val.replace('"', "'")
                     lines.append(f'has_attr("{rid}", "{safe_cat}", "{safe_val}").')
-                    # Capture persona/format values for synergy detection.
-                    if safe_cat == "persona":
-                        persona_vals.add(safe_val)
-                    if safe_cat == "format":
-                        format_vals.add(safe_val)
             for dim in sorted(dims):
                 safe_dim = dim.replace('"', "'")
                 lines.append(f'has_dim("{rid}", "{safe_dim}").')

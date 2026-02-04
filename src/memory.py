@@ -16,9 +16,15 @@ from core.datatypes import Rule
 from asp_solver import ASPSolver
 
 class MemoryManager:
-    def __init__(self, library_root: str = "library", frozen: bool = False):
+    def __init__(self, library_root: str = "library", frozen: bool = False, save_interval: int = 1):
         self.library_root = Path(library_root)
         self.frozen = frozen
+        try:
+            self.save_interval = max(0, int(save_interval))
+        except (TypeError, ValueError):
+            self.save_interval = 1
+        self._pending_updates = 0
+        self._dirty = False
         self.solver = ASPSolver(self.library_root)
         self.rule_stats_path = self.library_root / "rule_stats.json"
         self.archive_path = self.library_root / "rule_archive.jsonl"
@@ -34,12 +40,12 @@ class MemoryManager:
         self.layer2_rules: Dict[str, Rule] = {}
         self.layer1_rules: Dict[str, Rule] = {}
         
-        # Thresholds (slow down promotion to avoid "one-shot" elite rules)
-        self.L1_TO_L2_THRESHOLD = 3        # 3 successes to promote to Buffer
-        self.L2_TO_L3_THRESHOLD = 5        # 5 successes to promote to Long-term
-        self.L1_TO_L2_MIN_USES = 5         # minimum total uses before L1->L2
-        self.L2_TO_L3_MIN_USES = 10        # minimum total uses before L2->L3
-        self.CATEGORY_MIN_RULES = 3        # minimum rules per category to avoid skew
+        # Thresholds
+        self.L1_TO_L2_MIN_USES = 10        # minimum total uses before L1->L2
+        self.L1_TO_L2_MIN_RATE = 0.15      # minimum success rate for L1->L2 promotion
+        
+        self.L2_TO_L3_MIN_USES = 20        # minimum total uses before L2->L3
+        self.L2_TO_L3_MIN_RATE = 0.30      # minimum success rate for L2->L3 promotion
 
         # Utility blocker config + stats
         self.rule_stats_config = {
@@ -51,6 +57,22 @@ class MemoryManager:
         self._ensure_directories()
         self._load_rule_stats()
         self.load_all_layers()
+
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        self._pending_updates += 1
+        if self.save_interval > 0 and self._pending_updates >= self.save_interval:
+            self.flush()
+
+    def flush(self, force: bool = False) -> None:
+        if self.frozen and not force:
+            return
+        if not self._dirty and not force:
+            return
+        self.save_all_layers()
+        self._save_rule_stats()
+        self._pending_updates = 0
+        self._dirty = False
 
     def _ensure_directories(self):
         self.library_root.mkdir(parents=True, exist_ok=True)
@@ -144,13 +166,13 @@ class MemoryManager:
     def _prepare_rules_for_solver(self, rules: List[Rule]) -> List[Rule]:
         prepared: List[Rule] = []
         for rule in rules:
-            key_text = self._semantic_key(rule)
             prepared.append(
                 Rule(
                     rule_id=rule.rule_id,
                     content=rule.content,
                     formal_predicates=rule.formal_predicates,
                     tags=rule.tags,
+                    exemplars=list(rule.exemplars) if getattr(rule, "exemplars", None) else [],
                     success_count=rule.success_count,
                     failure_count=rule.failure_count,
                     total_uses=rule.total_uses,
@@ -216,15 +238,13 @@ class MemoryManager:
     def _save_layer(self, source_dict: Dict[str, Rule], path: Path):
         data: List[Dict[str, Any]] = []
         for r in source_dict.values():
-            primary_tag = str(r.tags[0]) if r.tags else ""
             stats_success_rate = (r.success_count / r.total_uses) if r.total_uses else 0.0
             entry: Dict[str, Any] = {
                 "rule_id": r.rule_id,
                 "definition": r.content,
                 "formal_predicates": r.formal_predicates,
-                "tag": primary_tag,
                 "tags": r.tags,
-                "exemplars": r.exemplars[:5] if r.exemplars else [],
+                "exemplars": r.exemplars[:2] if r.exemplars else [],
                 "statistics": {
                     "success_count": r.success_count,
                     "failure_count": r.failure_count,
@@ -249,7 +269,6 @@ class MemoryManager:
                     "rule_id",
                     "definition",
                     "formal_predicates",
-                    "tag",
                     "tags",
                     "exemplars",
                     "statistics",
@@ -295,35 +314,6 @@ class MemoryManager:
 
     # ========================== Retrieval ==========================
 
-    def get_all_unique_tags(self) -> List[str]:
-        tags = set()
-        for r in self.layer3_rules.values(): tags.update(r.tags)
-        for r in self.layer2_rules.values(): tags.update(r.tags)
-        for r in self.layer1_rules.values(): tags.update(r.tags)
-        return list(tags)
-
-    def _category_counts(self) -> Dict[str, int]:
-        counts: Dict[str, int] = {}
-        for rule in list(self.layer3_rules.values()) + list(self.layer2_rules.values()) + list(self.layer1_rules.values()):
-            for tag in rule.tags:
-                tag_str = str(tag).strip()
-                if not tag_str:
-                    continue
-                counts[tag_str] = counts.get(tag_str, 0) + 1
-        return counts
-
-    def is_category_sparse(self, categories: List[str]) -> bool:
-        if not categories:
-            return False
-        counts = self._category_counts()
-        for cat in categories:
-            cat_str = str(cat).strip()
-            if not cat_str:
-                continue
-            if counts.get(cat_str, 0) < self.CATEGORY_MIN_RULES:
-                return True
-        return False
-
     def retrieve_relevant_rules(
         self,
         query_tags: List[str],
@@ -333,7 +323,10 @@ class MemoryManager:
         goal_category: Optional[List[str] | str] = None,
     ) -> List[Rule]:
         """
-        Retrieves rules. Priority: Layer 2 (Hot) > Layer 3 (Stable) > Layer 1 (New).
+        Retrieve rules from all layers (L3/L2/L1).
+
+        Note: Preference for buffer (L2) rules is mainly expressed in the ASP program
+        via the `is_from_buffer/1` soft penalty. The Python fallback path is score-based.
         """
         all_rules = (
             list(self.layer3_rules.values())
@@ -353,9 +346,7 @@ class MemoryManager:
                 rule_tags = [str(t).strip() for t in (rule.tags or []) if str(t).strip()]
                 if tag_set.intersection(rule_tags):
                     tag_filtered.append(rule)
-            if tag_filtered and not self.is_category_sparse(query_tags):
-                filtered_rules = tag_filtered
-            elif tag_filtered:
+            if tag_filtered:
                 filtered_rules = tag_filtered
         prepared_rules = self._prepare_rules_for_solver(filtered_rules)
         usage_counts = {
@@ -415,8 +406,7 @@ class MemoryManager:
                             merged.append(t)
                     if merged != existing_tags:
                         best_rule.tags = merged
-                        self.save_all_layers()
-                        self._save_rule_stats()
+                        self._mark_dirty()
                 self.update_rule_feedback(best_rule_id, success=True)
                 return None
 
@@ -443,14 +433,13 @@ class MemoryManager:
             formal_predicates=formal_predicates,
             tags=tags,
             origin_buffer=False,
-            health_points=5,
-            max_health=5,
+            health_points=10,
+            max_health=10,
         )
         self.layer1_rules[rule_id] = new_rule
         self.rule_stats.setdefault(rule_id, {"usage_count": 0, "success_count": 0})
         print(f"[Memory] + Added {label} {rule_id} to Layer 1")
-        self.save_all_layers()
-        self._save_rule_stats()
+        self._mark_dirty()
         # archive append-only
         try:
             archive_entry = {
@@ -459,7 +448,7 @@ class MemoryManager:
                     "rule_id": rule_id,
                     "definition": content,
                     "formal_predicates": formal_predicates,
-                    "tag": (tags[0] if tags else ""),
+                    "tags": tags,
                     "exemplars": [],
                 },
             }
@@ -501,17 +490,15 @@ class MemoryManager:
         success_rate = rule.success_count / rule.total_uses if rule.total_uses else 0.0
 
         # Performance-based demotion/eviction
-        if layer == 3 and rule.total_uses >= 20 and success_rate < 0.25:
+        if layer == 3 and rule.total_uses >= self.L2_TO_L3_MIN_USES and success_rate < self.L2_TO_L3_MIN_RATE:
             rule.health_points = rule.max_health
             self._move_rule(rule_id, self.layer3_rules, self.layer2_rules, "L3->L2: Performance drop")
-            self.save_all_layers()
-            self._save_rule_stats()
+            self._mark_dirty()
             return
-        if layer == 2 and rule.total_uses >= 10 and success_rate < 0.20:
+        if layer == 2 and rule.total_uses >= self.L1_TO_L2_MIN_USES and success_rate < self.L1_TO_L2_MIN_RATE:
             rule.health_points = max(1, rule.max_health // 2)
             self._move_rule(rule_id, self.layer2_rules, self.layer1_rules, "L2->L1 (low utility)")
-            self.save_all_layers()
-            self._save_rule_stats()
+            self._mark_dirty()
             return
 
         # HP-based retention/eviction (performance check passed)
@@ -529,20 +516,18 @@ class MemoryManager:
         if success:
             if (
                 layer == 1
-                and rule.success_count >= self.L1_TO_L2_THRESHOLD
                 and rule.total_uses >= self.L1_TO_L2_MIN_USES
+                and success_rate >= self.L1_TO_L2_MIN_RATE
             ):
                 self._move_rule(rule_id, self.layer1_rules, self.layer2_rules, "L1->L2")
             elif (
                 layer == 2
-                and rule.success_count >= self.L2_TO_L3_THRESHOLD
                 and rule.total_uses >= self.L2_TO_L3_MIN_USES
-                and success_rate >= 0.5
+                and success_rate >= self.L2_TO_L3_MIN_RATE
             ):
                 self._move_rule(rule_id, self.layer2_rules, self.layer3_rules, "L2->L3 (Elite)")
 
-        self.save_all_layers()
-        self._save_rule_stats()
+        self._mark_dirty()
 
     def add_exemplar(
         self,
@@ -550,7 +535,7 @@ class MemoryManager:
         prompt_redacted: str,
         goal_redacted: str,
         delta_summary: str,
-        max_items: int = 5,
+        max_items: int = 2,
     ) -> None:
         if self.frozen:
             return
@@ -574,7 +559,7 @@ class MemoryManager:
             return
         updated = [exemplar] + existing
         rule.exemplars = updated[:max_items]
-        self.save_all_layers()
+        self._mark_dirty()
 
     def merge_rule_tags(self, rule_id: str, new_tags: List[str]) -> None:
         if self.frozen:
@@ -598,7 +583,7 @@ class MemoryManager:
                 merged.append(t)
         if merged != existing:
             rule.tags = merged
-            self.save_all_layers()
+            self._mark_dirty()
 
     def _move_rule(self, rule_id: str, src: dict, dst: dict, msg: str):
         if rule_id in src:
@@ -664,4 +649,6 @@ class MemoryManager:
         except Exception as exc:
             print(f"[Memory] Warning during reset_memory: {exc}")
         self.rule_stats.clear()
+        self._dirty = False
+        self._pending_updates = 0
         self.load_all_layers()

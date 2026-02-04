@@ -9,13 +9,17 @@ import argparse
 import csv
 import json
 import re
+import sys
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Any, List
 
-from src.llm_client import LLMClient
-from src.verifier import Verifier
+# Ensure `src/` is on sys.path so we can use consistent top-level imports.
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from llm_client import LLMClient
+from verifier import Verifier
 
 # Edit these defaults directly when you want to switch models or inputs.
 LOG_PATH = "logs/gpt-3.5-turbo-1106_harmbench200/advsub/lifelong_gpt-3.5-turbo-1106_20260201_212408_r2.csv"
@@ -98,7 +102,7 @@ def main() -> None:
         goal = r.get("goal") or ""
         response = r.get("target_response") or ""
         if response.strip():
-            verdict = verifier.verify(goal=goal, response=response, behavior_id=beh, context=None)
+            verdict = verifier.verify(goal=goal, response=response)
             score = verdict.get("score", 0.0)
             reasoning = verdict.get("reasoning", "")
             success = bool(verdict.get("success", False))

@@ -6,7 +6,7 @@ __pycache__/
 .env
 
 # Logs
-# logs/
+logs/
 
 # VSCode
 .vscode/
@@ -16,3 +16,9 @@ __pycache__/
 
 # Data (如果 data 里是原始大数据集，建议忽略；如果是必须的样例数据就别加)
 # data/
+
+# Experiment artifacts / snapshots
+library_*/
+old_library/
+old_lib/
+data/previous/

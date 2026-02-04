@@ -6,33 +6,25 @@ cd "$repo_root"
 
 target_model="gpt-3.5-turbo-1106"
 safe_model="$(printf '%s' "$target_model" | sed 's/[^a-zA-Z0-9_.-]/_/g')"
-warmup_dataset="adv_subset"
-harmbench_path="data/harmbench_200.csv"
+warmup_dataset="adv_subset_50"
+harmbench_path="data/harmbench_200.json"
 
-# Existing library after the first lifelong run.
-base_lifelong="$repo_root/library_${safe_model}_${warmup_dataset}_lifelong"
+# Naming convention matches the main script
+library_lifelong_prefix="$repo_root/library_${safe_model}_${warmup_dataset}_lifelong"
 
-# Two additional rounds will be created as copies and updated in-place.
-lifelong_r2="${base_lifelong}_r2"
-lifelong_r3="${base_lifelong}_r3"
+# We assume Run 1 is already done and exists
+start_lib="${library_lifelong_prefix}_run1"
 
-if [ ! -d "$base_lifelong" ]; then
-  echo "[Error] Base lifelong library not found: $base_lifelong"
-  echo "Run the warmup+lifelong script first to create it."
+if [ ! -d "$start_lib" ]; then
+  echo "[Error] Start library not found: $start_lib"
+  echo "Expected Run 1 to be completed."
   exit 1
 fi
 
-for path in "$lifelong_r2" "$lifelong_r3"; do
-  if [ -d "$path" ]; then
-    backup_root="${path}_backup_$(date +%Y%m%d_%H%M%S)"
-    echo "[Init] Existing library found. Moving to $backup_root"
-    mv "$path" "$backup_root"
-  fi
-done
-
 log_dir="$repo_root/logs/gpt-3.5-turbo-1106_harmbench200/advsub"
 mkdir -p "$log_dir"
-log_json="$log_dir/advsub_harmbench200_extra2_$(date +%Y%m%d_%H%M%S).json"
+# Use a distinctive log name so we know this was the extension run
+log_json="$log_dir/advsub_harmbench200_resume_runs23_$(date +%Y%m%d_%H%M%S).json"
 run_tag="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 script_start="$(date -Is)"
 runs_file="$(mktemp)"
@@ -44,11 +36,12 @@ run_cmd() {
   local label="$2"
   local cmd="$3"
   local log_path="${4:-}"
+  local lib_path="${5:-}"
   local start_ts end_ts exit_code
   local stdout_file stderr_file
 
   if [ -n "$log_path" ]; then
-    # Auto-resume: if last goal failed, rerun it with full attempts.
+    # Auto-resume logic (same as original)
     if [ -f "$log_path" ]; then
       resume_from="$(python - <<'PY'
 import csv, os, sys, tempfile
@@ -68,7 +61,6 @@ success = str(last.get("success", "")).strip().lower() == "true"
 if success or not goal_text:
     print(log_path)
     sys.exit(0)
-# Exclude the last (failed) goal so it will be rerun.
 tmp = tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8", newline="")
 with open(log_path, newline="", encoding="utf-8") as f:
     reader = csv.DictReader(f)
@@ -107,7 +99,7 @@ LOG_PATH="$log_path")"
   RUN_INDEX="$run_index" RUN_LABEL="$label" RUN_CMD="$cmd" \
   RUN_START="$start_ts" RUN_END="$end_ts" RUN_EXIT="$exit_code" \
   RUN_STDOUT="$stdout_file" RUN_STDERR="$stderr_file" \
-  LIB_ROOT="$base_lifelong" RUN_LOG_PATH="$log_path" \
+  LIB_ROOT="$lib_path" RUN_LOG_PATH="$log_path" \
   python - <<'PY' >> "$runs_file"
 import json
 import os
@@ -155,23 +147,42 @@ PY
   rm -f "$stdout_file" "$stderr_file"
 }
 
-echo "[Init] Copy base lifelong -> r2"
-cp -R "$base_lifelong" "$lifelong_r2"
+prev_lib="$start_lib"
 
-run_cmd 1 "[Run 1/2] lifelong round2 (harmbench_200)" \
-  "python main.py --stage lifelong --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${lifelong_r2}" \
-  "$log_dir/lifelong_${safe_model}_${run_tag}_r2.csv"
+# Continue with Run 2 and Run 3
+for i in 2 3; do
+  run_lib="${library_lifelong_prefix}_run${i}"
+  
+  if [ -d "$run_lib" ]; then
+    backup_root="${run_lib}_backup_$(date +%Y%m%d_%H%M%S)"
+    echo "[Init] Existing library found at $run_lib. Moving to $backup_root"
+    mv "$run_lib" "$backup_root"
+  fi
 
-echo "[Init] Copy r2 -> r3"
-cp -R "$lifelong_r2" "$lifelong_r3"
+  echo "[Init] Copying prev run lib to $run_lib"
+  cp -R "$prev_lib" "$run_lib"
 
-run_cmd 2 "[Run 2/2] lifelong round3 (harmbench_200)" \
-  "python main.py --stage lifelong --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${lifelong_r3}" \
-  "$log_dir/lifelong_${safe_model}_${run_tag}_r3.csv"
+  run_cmd "$i" "[Run ${i}/3] lifelong without reset (harmbench_200)" \
+    "python main.py --stage lifelong --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${run_lib}" \
+    "$log_dir/lifelong_${safe_model}_${run_tag}_run${i}.csv" \
+    "$run_lib"
 
-run_cmd 3 "[Run 1/1] frozen eval (harmbench_200)" \
-  "python main.py --stage lifelong --frozen --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${lifelong_r3}" \
-  "$log_dir/lifelong_frozen_${safe_model}_${run_tag}_r3.csv"
+  prev_lib="$run_lib"
+done
+
+# Frozen Eval (based on Run 3)
+frozen_lib="${library_lifelong_prefix}_run3_frozen"
+if [ -d "$frozen_lib" ]; then
+    backup_root="${frozen_lib}_backup_$(date +%Y%m%d_%H%M%S)"
+    echo "[Init] Existing frozen library found. Moving to $backup_root"
+    mv "$frozen_lib" "$backup_root"
+fi
+cp -R "$prev_lib" "$frozen_lib"
+
+run_cmd 5 "[Run 1/1] frozen eval (harmbench_200)" \
+  "python main.py --stage lifelong --frozen --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${frozen_lib}" \
+  "$log_dir/lifelong_frozen_${safe_model}_${run_tag}.csv" \
+  "$frozen_lib"
 
 script_end="$(date -Is)"
 

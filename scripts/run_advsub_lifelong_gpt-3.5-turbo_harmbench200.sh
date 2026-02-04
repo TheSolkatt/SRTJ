@@ -6,19 +6,21 @@ cd "$repo_root"
 
 target_model="gpt-3.5-turbo-1106"
 safe_model="$(printf '%s' "$target_model" | sed 's/[^a-zA-Z0-9_.-]/_/g')"
-warmup_dataset="adv_subset"
-warmup_path="data/adv_subset_50.csv"
+warmup_dataset="adv_subset_50"
+warmup_path="data/adv_subset_50.json"
 library_root="$repo_root/library_${safe_model}_${warmup_dataset}"
-library_lifelong="$repo_root/library_${safe_model}_${warmup_dataset}_lifelong"
+library_lifelong_prefix="$repo_root/library_${safe_model}_${warmup_dataset}_lifelong"
 base_library="$repo_root/library"
 
-for path in "$library_root" "$library_lifelong"; do
+shopt -s nullglob
+for path in "${library_root}"* "${library_lifelong_prefix}"*; do
   if [ -d "$path" ]; then
     backup_root="${path}_backup_$(date +%Y%m%d_%H%M%S)"
     echo "[Init] Existing library found. Moving to $backup_root"
     mv "$path" "$backup_root"
   fi
 done
+shopt -u nullglob
 mkdir -p "$library_root"
 for filename in solver.lp asp_config.json ontology.json; do
   if [ -f "$base_library/$filename" ]; then
@@ -34,13 +36,14 @@ script_start="$(date -Is)"
 runs_file="$(mktemp)"
 combined_stdout="$(mktemp)"
 combined_stderr="$(mktemp)"
-harmbench_path="data/harmbench_200.csv"
+harmbench_path="data/harmbench_200.json"
 
 run_cmd() {
   local run_index="$1"
   local label="$2"
   local cmd="$3"
   local log_path="${4:-}"
+  local lib_path="${5:-$library_root}"
   local start_ts end_ts exit_code
   local stdout_file stderr_file
 
@@ -105,7 +108,7 @@ LOG_PATH="$log_path")"
   RUN_INDEX="$run_index" RUN_LABEL="$label" RUN_CMD="$cmd" \
   RUN_START="$start_ts" RUN_END="$end_ts" RUN_EXIT="$exit_code" \
   RUN_STDOUT="$stdout_file" RUN_STDERR="$stderr_file" \
-  LIB_ROOT="$library_root" RUN_LOG_PATH="$log_path" \
+  LIB_ROOT="$lib_path" RUN_LOG_PATH="$log_path" \
   python - <<'PY' >> "$runs_file"
 import json
 import os
@@ -154,19 +157,30 @@ PY
 }
 
 run_cmd 1 "[Run 1/1] warmup with reset (${warmup_dataset})" \
-  "python main.py --stage warmup --warmup-dataset ${warmup_dataset} --warmup-path ${warmup_path} --reset --target-model ${target_model} --library-root ${library_root}" \
-  "$log_dir/warmup_${safe_model}_${run_tag}.csv"
+  "python main.py --stage warmup --warmup-path ${warmup_path} --reset --target-model ${target_model} --library-root ${library_root}" \
+  "$log_dir/warmup_${safe_model}_${run_tag}.csv" \
+  "$library_root"
 
-# Snapshot the warmup library: keep a lifelong working copy
-cp -R "$library_root" "$library_lifelong"
+prev_lib="$library_root"
+for i in 1 2 3; do
+  run_lib="${library_lifelong_prefix}_run${i}"
+  cp -R "$prev_lib" "$run_lib"
 
-run_cmd 2 "[Run 1/1] lifelong without reset (harmbench_200)" \
-  "python main.py --stage lifelong --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${library_lifelong}" \
-  "$log_dir/lifelong_${safe_model}_${run_tag}_run1.csv"
+  run_cmd $((i + 1)) "[Run ${i}/3] lifelong without reset (harmbench_200)" \
+    "python main.py --stage lifelong --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${run_lib}" \
+    "$log_dir/lifelong_${safe_model}_${run_tag}_run${i}.csv" \
+    "$run_lib"
 
-run_cmd 3 "[Run 1/1] frozen eval (harmbench_200)" \
-  "python main.py --stage lifelong --frozen --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${library_lifelong}" \
-  "$log_dir/lifelong_frozen_${safe_model}_${run_tag}.csv"
+  prev_lib="$run_lib"
+done
+
+frozen_lib="${library_lifelong_prefix}_run3_frozen"
+cp -R "$prev_lib" "$frozen_lib"
+
+run_cmd 5 "[Run 1/1] frozen eval (harmbench_200)" \
+  "python main.py --stage lifelong --frozen --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${frozen_lib}" \
+  "$log_dir/lifelong_frozen_${safe_model}_${run_tag}.csv" \
+  "$frozen_lib"
 
 script_end="$(date -Is)"
 

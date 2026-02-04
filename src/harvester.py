@@ -17,10 +17,8 @@ class ComparativeRuleHarvester:
         goal_prompt: str,
         successful_prompt: str,
         history_attempts: Optional[List[Any]] = None,
-        intent_categories: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         history_attempts = history_attempts or []
-        intent_categories = intent_categories or []
 
         history_section = ""
         if history_attempts:

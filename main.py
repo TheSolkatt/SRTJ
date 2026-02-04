@@ -14,11 +14,9 @@ from typing import Any, Dict, List, Optional
 # 添加 src 目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.manager import Manager
-from src.llm_client import LLMClient
+from manager import Manager
+from llm_client import LLMClient
 from core.data_loader import (
-    load_jbb_dataset,
-    load_strongreject_dataset,
     load_adv_subset_dataset,
     load_harmbench_dataset,
 )
@@ -26,8 +24,29 @@ from core.datatypes import AttackGoal, Rule
 
 
 class AttemptLogger:
+    DEFAULT_FIELDS = [
+        "timestamp",
+        "attempt",
+        "mode",
+        "goal",
+        "goal_tags",
+        "behavior_id",
+        "final_prompt",
+        "target_response",
+        "verifier_score",
+        "success",
+        "reasoning",
+        "guidance_used",
+        "rule_ids",
+        "rule_scores",
+        "rule_tags",
+        "dims_covered",
+        "banned_rules",
+    ]
+
     def __init__(self, log_path: Optional[str | Path]) -> None:
         self.log_path = Path(log_path) if log_path else None
+        self._fieldnames: Optional[List[str]] = None
 
     def _extract_dims(self, rules: List[Rule]) -> List[str]:
         dims = set()
@@ -38,11 +57,32 @@ class AttemptLogger:
                     dims.add(match.group(1))
         return sorted(dims)
 
+    def _read_existing_header(self) -> Optional[List[str]]:
+        if not self.log_path or not self.log_path.exists():
+            return None
+        try:
+            with self.log_path.open("r", newline="", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+        except Exception:
+            return None
+        header = [h.strip() for h in (header or []) if str(h).strip()]
+        return header or None
+
+    def _get_fieldnames(self, file_exists: bool) -> List[str]:
+        if not file_exists:
+            self._fieldnames = list(self.DEFAULT_FIELDS)
+            return self._fieldnames
+        if self._fieldnames is None:
+            self._fieldnames = self._read_existing_header() or list(self.DEFAULT_FIELDS)
+        return self._fieldnames
+
     def log_attempt(
         self,
         goal: AttackGoal,
         goal_tags: List[str],
         attempt: int,
+        mode: Optional[str],
         rules: List[Rule],
         final_prompt: str,
         target_response: str,
@@ -50,13 +90,12 @@ class AttemptLogger:
         verdict: Dict[str, Any],
         attacker_trace: Optional[Dict[str, str]] = None,
         guidance_used: Optional[str] = None,
-        vs_used: Optional[bool] = None,
     ) -> None:
         if not self.log_path:
             return
 
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        file_exists = self.log_path.exists()
+        file_exists = self.log_path.exists() and self.log_path.stat().st_size > 0
 
         rule_ids = [r.rule_id for r in rules] if rules else []
         rule_scores = [round(r.score(), 4) for r in rules] if rules else []
@@ -73,58 +112,31 @@ class AttemptLogger:
         # attacker_clean_output = attacker_trace.get("clean_output", "")
 
         with self.log_path.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            fieldnames = self._get_fieldnames(file_exists=file_exists)
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             if not file_exists:
-                writer.writerow(
-                    [
-                        "timestamp",
-                        "attempt",
-                        "goal",
-                        "goal_tags",
-                        "behavior_id",
-                        "final_prompt",
-                        # "attacker_system_prompt",
-                        # "attacker_user_prompt",
-                        # "attacker_raw_output",
-                        # "attacker_clean_output",
-                        "target_response",
-                        "verifier_score",
-                        "success",
-                        "reasoning",
-                        "guidance_used",
-                        "vs_used",
-                        "rule_ids",
-                        "rule_scores",
-                        "rule_tags",
-                        "dims_covered",
-                        "banned_rules",
-                    ]
-                )
-            writer.writerow(
-                [
-                    datetime.utcnow().isoformat(),
-                    attempt,
-                    goal.prompt,
-                    goal_tags_json,
-                    getattr(goal, "behavior_id", None),
-                    f"\n{final_prompt}",
-                    # attacker_system_prompt,
-                    # attacker_user_prompt,
-                    # attacker_raw_output,
-                    # attacker_clean_output,
-                    f"\n{target_response}",
-                    f"\n{verifier_score}",
-                    verdict.get("success"),
-                    verdict.get("reasoning", ""),
-                    guidance_used or "",
-                    vs_used if vs_used is not None else "",
-                    f"\n{json.dumps(rule_ids)}",
-                    json.dumps(rule_scores),
-                    json.dumps(rule_tags),
-                    json.dumps(dims_covered),
-                    banned_rules_json,
-                ]
-            )
+                writer.writeheader()
+
+            row = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "attempt": attempt,
+                "mode": (mode or "").strip(),
+                "goal": goal.prompt,
+                "goal_tags": goal_tags_json,
+                "behavior_id": getattr(goal, "behavior_id", None),
+                "final_prompt": f"\n{final_prompt}",
+                "target_response": f"\n{target_response}",
+                "verifier_score": f"\n{verifier_score}",
+                "success": verdict.get("success"),
+                "reasoning": verdict.get("reasoning", ""),
+                "guidance_used": guidance_used or "",
+                "rule_ids": f"\n{json.dumps(rule_ids)}",
+                "rule_scores": json.dumps(rule_scores),
+                "rule_tags": json.dumps(rule_tags),
+                "dims_covered": json.dumps(dims_covered),
+                "banned_rules": banned_rules_json,
+            }
+            writer.writerow(row)
 
 
 def run_experiment(
@@ -142,11 +154,15 @@ def run_experiment(
     goal_index: int | None = None,
     behavior_id: str | None = None,
     harmbench_path: str | None = None,
-    warmup_dataset: str | None = None,
     warmup_path: str | None = None,
     target_model: str | None = None,
     library_root: str | None = None,
     frozen: bool = False,
+    disable_planner: bool = False,
+    disable_symbolizer: bool = False,
+    fast: bool = False,
+    save_interval: int = 1,
+    save_per_goal: bool = False,
 ) -> None:
     def _sanitize_model_name(name: str) -> str:
         cleaned = re.sub(r"[^a-zA-Z0-9_.-]+", "_", name).strip("_")
@@ -166,11 +182,14 @@ def run_experiment(
     else:
         log_path = None
 
+    disable_planner = disable_planner or fast
+    disable_symbolizer = disable_symbolizer or fast
+
     # Mixed-model clients: planner + attacker + target + verifier.
     attacker_client = LLMClient(model_name="deepseek-r1")
     target_client = LLMClient(model_name=target_model or "gpt-3.5-turbo-1106")
     verifier_client = LLMClient(model_name="gpt-4o")
-    planner_client = LLMClient(model_name="deepseek-r1")
+    planner_client = None if disable_planner else LLMClient(model_name="deepseek-r1")
     analysis_client = LLMClient(model_name="gpt-4o")
     logger = AttemptLogger(log_path)
 
@@ -187,6 +206,9 @@ def run_experiment(
         library_root=library_root,
         frozen=frozen,
         stage=stage,
+        enable_planner=not disable_planner,
+        enable_symbolizer=not disable_symbolizer,
+        save_interval=save_interval,
     )
 
     if reset:
@@ -198,37 +220,30 @@ def run_experiment(
     rule_added_count = 0
 
     if stage == "warmup":
-        warmup_dataset = (warmup_dataset or "jbb").strip().lower()
-        if warmup_dataset == "adv_subset":
-            goals = load_adv_subset_dataset(warmup_path or "data/adv_subset.csv")
-            if not goals:
-                print("[main] No adv_subset goals loaded; aborting.")
-                return
-            dataset_label = "adv_subset (warmup)"
-        else:
-            goals = load_jbb_dataset(warmup_path or "data/jbb.csv")
-            if not goals:
-                print("[main] No JBB goals loaded; aborting.")
-                return
-            dataset_label = "JBB (warmup)"
+        goals = load_adv_subset_dataset(warmup_path or "data/adv_subset_50.json")
+        if not goals:
+            print("[main] No adv_subset goals loaded; aborting.")
+            return
+        dataset_label = "adv_subset_50 (warmup)"
     elif stage == "lifelong":
         # Keep existing library; run harmbench
-        goals = load_harmbench_dataset(harmbench_path or "data/harmbench.csv")
+        goals = load_harmbench_dataset(harmbench_path or "data/harmbench_200.json")
         if not goals:
             print("[main] No harmbench goals loaded; aborting.")
             return
-        dataset_label = "harmbench (frozen eval)" if frozen else "harmbench (lifelong)"
-    elif dataset == "jbb":
-        goals = load_jbb_dataset("data/jbb.csv")
+        dataset_label = "harmbench_200 (frozen eval)" if frozen else "harmbench_200 (lifelong)"
+    elif dataset == "adv_subset":
+        goals = load_adv_subset_dataset("data/adv_subset_50.json")
         if not goals:
-            print("[main] No JBB goals loaded; aborting.")
+            print("[main] No adv_subset goals loaded; aborting.")
             return
-        dataset_label = "JBB (Harmful Behaviors)"
-    elif dataset == "strongreject":
-        goals = load_strongreject_dataset("data/strongreject_small_dataset.csv")
+        dataset_label = "adv_subset_50"
+    elif dataset == "harmbench":
+        goals = load_harmbench_dataset("data/harmbench_200.json")
         if not goals:
-            print("[main] No StrongREJECT goals loaded; aborting.")
+            print("[main] No harmbench goals loaded; aborting.")
             return
+        dataset_label = "harmbench_200"
     else:
         print("[main] Unknown dataset/stage selection. Provide --stage or --dataset.")
         return
@@ -299,6 +314,8 @@ def run_experiment(
         print(f"[Goal {idx:2d}/{sample_size}] | {getattr(goal, 'prompt', '')}")
         initial_rules = len(manager.memory.layer3_rules) + len(manager.memory.layer2_rules) + len(manager.memory.layer1_rules)
         manager.process_goal(goal)
+        if save_per_goal:
+            manager.memory.flush(force=True)
         current_rules = len(manager.memory.layer3_rules) + len(manager.memory.layer2_rules) + len(manager.memory.layer1_rules)
         
         if current_rules > initial_rules:
@@ -307,7 +324,7 @@ def run_experiment(
         else:
             print()
 
-    manager.memory.save_all_layers()
+    manager.memory.flush(force=True)
 
     final_layer3 = len(manager.memory.layer3_rules)
     final_layer2 = len(manager.memory.layer2_rules)
@@ -350,7 +367,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run jailbreak experiment on a selected dataset or stage.")
     parser.add_argument(
         "--dataset",
-        choices=["jbb", "strongreject", "adv_subset", "harmbench"],
+        choices=["adv_subset", "harmbench"],
         required=False,
         help="Select which dataset to run (ignored if --stage is set).",
     )
@@ -358,7 +375,7 @@ if __name__ == "__main__":
         "--stage",
         choices=["warmup", "lifelong"],
         required=False,
-        help="Stages: warmup (adv_subset) or lifelong (harmbench, keep memory)."
+        help="Stages: warmup (adv_subset_50) or lifelong (harmbench_200, keep memory)."
     )
     parser.add_argument(
         "--num_samples",
@@ -399,7 +416,7 @@ if __name__ == "__main__":
         "--success-threshold",
         type=float,
         default=default_threshold,
-        help="Verifier success threshold (default: from asp_config.json or 8.0)",
+        help="Verifier success threshold (default: from asp_config.json or 5).",
     )
     parser.add_argument(
         "--random-sample",
@@ -416,19 +433,13 @@ if __name__ == "__main__":
         "--harmbench-path",
         type=str,
         default=None,
-        help="Optional HarmBench CSV path (default: data/harmbench.csv).",
-    )
-    parser.add_argument(
-        "--warmup-dataset",
-        choices=["jbb", "adv_subset"],
-        default="jbb",
-        help="Warmup dataset to use when --stage warmup (default: jbb).",
+        help="Optional HarmBench JSON path (default: data/harmbench_200.json).",
     )
     parser.add_argument(
         "--warmup-path",
         type=str,
         default=None,
-        help="Optional warmup CSV path (overrides default for warmup dataset).",
+        help="Optional warmup JSON path (default: data/adv_subset_50.json).",
     )
     parser.add_argument(
         "--target-model",
@@ -446,6 +457,32 @@ if __name__ == "__main__":
         "--frozen",
         action="store_true",
         help="Freeze memory updates (read-only evaluation).",
+    )
+    parser.add_argument(
+        "--disable-planner",
+        action="store_true",
+        help="Disable planner guidance to reduce LLM calls.",
+    )
+    parser.add_argument(
+        "--disable-symbolizer",
+        action="store_true",
+        help="Disable symbolic conversion on harvested rules.",
+    )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Shortcut: disable planner and symbolizer for faster runs.",
+    )
+    parser.add_argument(
+        "--save-interval",
+        type=int,
+        default=1,
+        help="Autosave interval for memory updates (1=every update, 0=manual only).",
+    )
+    parser.add_argument(
+        "--save-per-goal",
+        action="store_true",
+        help="Force memory save at the end of each goal.",
     )
     parser.add_argument(
         "--goal-index",
@@ -475,9 +512,13 @@ if __name__ == "__main__":
         goal_index=args.goal_index,
         behavior_id=args.behavior_id,
         harmbench_path=args.harmbench_path,
-        warmup_dataset=args.warmup_dataset,
         warmup_path=args.warmup_path,
         target_model=args.target_model,
         library_root=args.library_root,
         frozen=args.frozen,
+        disable_planner=args.disable_planner,
+        disable_symbolizer=args.disable_symbolizer,
+        fast=args.fast,
+        save_interval=args.save_interval,
+        save_per_goal=args.save_per_goal,
     )
