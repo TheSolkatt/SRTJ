@@ -15,6 +15,8 @@ SRTJ 是一个 **训练-free** 的规则驱动红队系统。核心闭环：
 - **Harvester**：成功后抽取可复用规则（建议用于 lifelong）。
 - **Symbolizer**：把规则转为 formal predicates 以进入 ASP 推理（可关）。
 
+注：当前实现为减少 token/噪声，仅将 Planner 输出中的 `Actionable Instruction` 行传给 Attacker。
+
 **数据分类：**
 当前实验数据集已预标注 `category`（单标签，固定 6 类），运行时直接读取，不做在线分类。  
 6 类：`illegal / chemical_biological / cybercrime_intrusion / harmful / misinformation_disinformation / harassment_bullying`。

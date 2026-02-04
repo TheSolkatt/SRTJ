@@ -82,6 +82,7 @@ SRTJ 是一个 **训练‑free** 的规则驱动红队系统：用 **ASP 选规�
 
 **Planner**  
 失败后给“策略建议”（不生成 prompt），增加一次 LLM 调用。  
+为减少噪声与 token，当前实现只将 Planner 的 `Actionable Instruction` 行传给 Attacker。  
 关闭：`--disable-planner` 或 `--fast`
 
 **Harvester**  
