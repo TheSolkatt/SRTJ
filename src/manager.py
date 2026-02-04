@@ -87,6 +87,26 @@ class Manager:
 
         self.symbolizer = Symbolizer(client=self.analysis_client, ontology=self.ontology) if self.enable_symbolizer else None
 
+    def _planner_actionable_instruction(self, planner_text: str) -> str:
+        """
+        Planner returns a 3-line block:
+          Analysis: ...
+          Strategy: ...
+          Actionable Instruction: ...
+        We only feed the actionable instruction back to Attacker to reduce tokens/noise.
+        """
+        if not planner_text:
+            return ""
+        lines = [ln.strip() for ln in str(planner_text).splitlines() if ln.strip()]
+        for ln in lines:
+            lower = ln.lower()
+            if lower.startswith("actionable instruction:"):
+                return ln.split(":", 1)[1].strip()
+            if lower.startswith("actionable:"):
+                return ln.split(":", 1)[1].strip()
+        # Fallback: keep it short (do not dump full analysis back into Attacker).
+        return " ".join(lines)[:300].strip()
+
     def _goal_text(self, goal: AttackGoal) -> str:
         prompt = (goal.prompt or "").strip()
         context = (goal.context or "").strip()
@@ -420,11 +440,8 @@ class Manager:
             nonlocal blind_attempts_used
             invalid_skips = 0
             while blind_attempts_used < max_blind_attempts:
-                planner_guidance = (
-                    self._plan_strategy(goal, failure_history, [], tags)
-                    if failure_history
-                    else ""
-                )
+                planner_text = self._plan_strategy(goal, failure_history, [], tags) if failure_history else ""
+                planner_guidance = self._planner_actionable_instruction(planner_text)
                 success, reason, attempted = self._blind_attack(
                     goal,
                     tags,
@@ -494,7 +511,7 @@ class Manager:
                     if failure_history
                     else ""
                 )
-                guidance_used = planner_guidance
+                guidance_used = self._planner_actionable_instruction(planner_guidance)
                 valid_prompt = False
                 for regen_idx in range(1, max_prompt_regen + 1):
                     regen_note = None
