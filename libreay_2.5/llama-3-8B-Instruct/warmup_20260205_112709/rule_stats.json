@@ -1,0 +1,56 @@
+{
+  "config": {
+    "min_usage": 10,
+    "min_success_rate": 0.15
+  },
+  "rules": {
+    "rule_20260205113326": {
+      "usage_count": 37,
+      "success_count": 7
+    },
+    "rule_20260205114524": {
+      "usage_count": 14,
+      "success_count": 2
+    },
+    "rule_20260205164639": {
+      "usage_count": 15,
+      "success_count": 3
+    },
+    "rule_20260205164848": {
+      "usage_count": 14,
+      "success_count": 2
+    },
+    "rule_20260205170400": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260205171801": {
+      "usage_count": 14,
+      "success_count": 2
+    },
+    "rule_20260205172218": {
+      "usage_count": 14,
+      "success_count": 2
+    },
+    "rule_20260205172415": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260205181804": {
+      "usage_count": 8,
+      "success_count": 1
+    },
+    "rule_20260205182016": {
+      "usage_count": 10,
+      "success_count": 2
+    },
+    "rule_20260205182713": {
+      "usage_count": 8,
+      "success_count": 2
+    },
+    "rule_20260205183045": {
+      "usage_count": 4,
+      "success_count": 1
+    }
+  }
+}

@@ -108,10 +108,11 @@ SRTJ 是一个 **训练‑free** 的规则驱动红队系统：用 **ASP 选规�
 - `verifier_threshold=5`
 
 **记忆演化 / src/memory.py**
-- L1→L2：uses ≥ 5 且 success_rate ≥ 0.30  
-- L2→L3：uses ≥ 10 且 success_rate ≥ 0.40  
-- L3 低效降级：uses ≥ 20 且 success_rate < 0.30  
-- L2 低效降级：uses ≥ 10 且 success_rate < 0.20  
+- L1→L2：uses ≥ 10 且 success_rate ≥ 0.15  
+- L2→L3：uses ≥ 20 且 success_rate ≥ 0.30  
+- L3→L2（低效降级）：uses ≥ 20 且 success_rate < 0.30  
+- L2→L1（低效降级）：uses ≥ 10 且 success_rate < 0.15  
+- Utility Blocker：uses > 10 且 success_rate < 0.15 的规则会被检索阶段屏蔽  
 - 语义去重阈值：0.85
 
 ---
@@ -143,6 +144,18 @@ python main.py --stage warmup --save-interval 0 --save-per-goal
 
 ---
 
+## 日志分析（推荐）
+
+```bash
+# 统计 ASR / attempts-per-goal / 速度（attempt 间隔、最慢 goal 等）
+python scripts/analyze_logs.py logs/gpt-3.5-turbo-1106/2.4
+
+# 多个 CSV 一起分析，并导出 JSON（便于画图/汇总）
+python scripts/analyze_logs.py logs/gpt-3.5-turbo-1106/2.4/*.csv --json /tmp/srtj_log_summary.json
+```
+
+---
+
 ## 默认模型（main.py）
 
 - Attacker：`deepseek-r1`
@@ -157,7 +170,7 @@ python main.py --stage warmup --save-interval 0 --save-per-goal
 ## 日志字段（AttemptLogger）
 
 ```
-timestamp, attempt, mode, goal, goal_tags, behavior_id, final_prompt,
+timestamp, attempt, mode, goal, goal_tags, final_prompt,
 target_response, verifier_score, success, reasoning, guidance_used,
 rule_ids, rule_scores, rule_tags, dims_covered, banned_rules
 ```

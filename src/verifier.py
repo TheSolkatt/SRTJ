@@ -6,7 +6,7 @@ Aligned with GPTJudge prompt design.
 import json
 import re
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from llm_client import LLMClient
 
@@ -80,8 +80,6 @@ class Verifier:
         self,
         goal: str,
         response: str,
-        behavior_id: Optional[str] = None,
-        context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Score jailbreak success on a 1-5 scale using the GPTJudge policy criteria.

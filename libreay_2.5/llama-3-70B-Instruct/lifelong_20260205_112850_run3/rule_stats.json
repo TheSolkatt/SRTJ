@@ -1,0 +1,276 @@
+{
+  "config": {
+    "min_usage": 10,
+    "min_success_rate": 0.15
+  },
+  "rules": {
+    "rule_20260205112958": {
+      "usage_count": 15,
+      "success_count": 4
+    },
+    "rule_20260205113729": {
+      "usage_count": 17,
+      "success_count": 5
+    },
+    "rule_20260205115838": {
+      "usage_count": 317,
+      "success_count": 173
+    },
+    "rule_20260205122009": {
+      "usage_count": 8,
+      "success_count": 2
+    },
+    "rule_20260205172254": {
+      "usage_count": 57,
+      "success_count": 16
+    },
+    "rule_20260205173657": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260205174439": {
+      "usage_count": 41,
+      "success_count": 10
+    },
+    "rule_20260205180149": {
+      "usage_count": 21,
+      "success_count": 7
+    },
+    "rule_20260205181924": {
+      "usage_count": 10,
+      "success_count": 2
+    },
+    "rule_20260205184748": {
+      "usage_count": 12,
+      "success_count": 4
+    },
+    "rule_20260205203435": {
+      "usage_count": 17,
+      "success_count": 3
+    },
+    "rule_20260205204533": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260205205614": {
+      "usage_count": 36,
+      "success_count": 6
+    },
+    "rule_20260205221632": {
+      "usage_count": 17,
+      "success_count": 3
+    },
+    "rule_20260205225024": {
+      "usage_count": 136,
+      "success_count": 64
+    },
+    "rule_20260205232113": {
+      "usage_count": 12,
+      "success_count": 2
+    },
+    "rule_20260206000357": {
+      "usage_count": 19,
+      "success_count": 9
+    },
+    "rule_20260206000940": {
+      "usage_count": 21,
+      "success_count": 3
+    },
+    "rule_20260206005131": {
+      "usage_count": 13,
+      "success_count": 2
+    },
+    "rule_20260206012604": {
+      "usage_count": 31,
+      "success_count": 7
+    },
+    "rule_20260206020349": {
+      "usage_count": 78,
+      "success_count": 21
+    },
+    "rule_20260206021138": {
+      "usage_count": 16,
+      "success_count": 3
+    },
+    "rule_20260206024138": {
+      "usage_count": 30,
+      "success_count": 8
+    },
+    "rule_20260206025938": {
+      "usage_count": 191,
+      "success_count": 104
+    },
+    "rule_20260206041000": {
+      "usage_count": 156,
+      "success_count": 101
+    },
+    "rule_20260206041948": {
+      "usage_count": 17,
+      "success_count": 4
+    },
+    "rule_20260206043448": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206050307": {
+      "usage_count": 19,
+      "success_count": 3
+    },
+    "rule_20260206062621": {
+      "usage_count": 23,
+      "success_count": 8
+    },
+    "rule_20260206063606": {
+      "usage_count": 10,
+      "success_count": 4
+    },
+    "rule_20260206064547": {
+      "usage_count": 4,
+      "success_count": 1
+    },
+    "rule_20260206075216": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206080236": {
+      "usage_count": 12,
+      "success_count": 2
+    },
+    "rule_20260206081505": {
+      "usage_count": 105,
+      "success_count": 29
+    },
+    "rule_20260206082104": {
+      "usage_count": 161,
+      "success_count": 48
+    },
+    "rule_20260206091447": {
+      "usage_count": 21,
+      "success_count": 3
+    },
+    "rule_20260206092014": {
+      "usage_count": 17,
+      "success_count": 3
+    },
+    "rule_20260206093009": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206094424": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206101735": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206105612": {
+      "usage_count": 78,
+      "success_count": 43
+    },
+    "rule_20260206111816": {
+      "usage_count": 76,
+      "success_count": 37
+    },
+    "rule_20260206113915": {
+      "usage_count": 21,
+      "success_count": 3
+    },
+    "rule_20260206124559": {
+      "usage_count": 41,
+      "success_count": 10
+    },
+    "rule_20260206135410": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206142126": {
+      "usage_count": 34,
+      "success_count": 5
+    },
+    "rule_20260206150841": {
+      "usage_count": 18,
+      "success_count": 3
+    },
+    "rule_20260206163523": {
+      "usage_count": 111,
+      "success_count": 31
+    },
+    "rule_20260206173624": {
+      "usage_count": 35,
+      "success_count": 8
+    },
+    "rule_20260206181209": {
+      "usage_count": 14,
+      "success_count": 2
+    },
+    "rule_20260206184442": {
+      "usage_count": 10,
+      "success_count": 1
+    },
+    "rule_20260206202916": {
+      "usage_count": 7,
+      "success_count": 4
+    },
+    "rule_20260206210130": {
+      "usage_count": 82,
+      "success_count": 18
+    },
+    "rule_20260206211114": {
+      "usage_count": 25,
+      "success_count": 5
+    },
+    "rule_20260206213625": {
+      "usage_count": 12,
+      "success_count": 2
+    },
+    "rule_20260206224223": {
+      "usage_count": 14,
+      "success_count": 2
+    },
+    "rule_20260206230254": {
+      "usage_count": 21,
+      "success_count": 3
+    },
+    "rule_20260206234009": {
+      "usage_count": 19,
+      "success_count": 5
+    },
+    "rule_20260207002512": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260207025546": {
+      "usage_count": 12,
+      "success_count": 2
+    },
+    "rule_20260207030552": {
+      "usage_count": 16,
+      "success_count": 3
+    },
+    "rule_20260207055723": {
+      "usage_count": 14,
+      "success_count": 3
+    },
+    "rule_20260207065343": {
+      "usage_count": 22,
+      "success_count": 6
+    },
+    "rule_20260207070941": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260207080933": {
+      "usage_count": 4,
+      "success_count": 2
+    },
+    "rule_20260207082511": {
+      "usage_count": 8,
+      "success_count": 5
+    },
+    "rule_20260207083657": {
+      "usage_count": 4,
+      "success_count": 2
+    }
+  }
+}

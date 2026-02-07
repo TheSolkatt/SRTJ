@@ -1,0 +1,20 @@
+{
+  "config": {
+    "min_usage": 10,
+    "min_success_rate": 0.15
+  },
+  "rules": {
+    "rule_20260205113310": {
+      "usage_count": 61,
+      "success_count": 36
+    },
+    "rule_20260205113639": {
+      "usage_count": 46,
+      "success_count": 23
+    },
+    "rule_20260205122540": {
+      "usage_count": 4,
+      "success_count": 1
+    }
+  }
+}

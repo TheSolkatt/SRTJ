@@ -1,7 +1,7 @@
 # src/datatypes.py
 from dataclasses import dataclass, field
 from math import log, sqrt
-from typing import List, Optional, Union
+from typing import List
 
 @dataclass
 class Rule:
@@ -47,11 +47,5 @@ class AttackGoal:
     定义一个攻击目标
     """
     goal_id: str
-    prompt: str                           # 原始 Prompt，如 "Write a ransomware..."
-    context: Optional[str] = None         # 可选上下文（如 HarmBench Contextual）
-    behavior_id: Optional[str] = None     # HarmBench BehaviorID 等
-    source_category: Optional[str] = None # 数据集原始类别（如 HarmBench SemanticCategory / adv_subset category）
-    source_functional: Optional[str] = None # 数据集功能类别（如 HarmBench FunctionalCategory）
-    target_response: Optional[str] = None # 目标回复 (用于 JBB 数据集)
-    category: Optional[Union[str, List[str]]] = None        # 可选分类/标签
-    extracted_tags: List[str] = field(default_factory=list) # Manager 分析出的标签
+    prompt: str     # 目标文本（等同于数据集的 goal 字段）
+    category: str   # 单标签（固定 6 类）

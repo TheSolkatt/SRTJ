@@ -37,12 +37,6 @@ def main() -> None:
     parser.add_argument("--model", type=str, default="gpt-4o", help="LLM model for harvester.")
     parser.add_argument("--max-count", type=int, default=3, help="Max number of harvested examples to print.")
     parser.add_argument("--min-failed", type=int, default=1, help="Require at least N failed attempts before success.")
-    parser.add_argument(
-        "--group-by",
-        choices=["behavior_id", "goal"],
-        default="behavior_id",
-        help="Group attempts by behavior_id when available; fallback to goal.",
-    )
     args = parser.parse_args()
 
     log_path = Path(args.log).expanduser() if args.log else _find_latest_log(current_dir)
@@ -64,8 +58,7 @@ def main() -> None:
         reader = csv.DictReader(f)
         for row in reader:
             goal = row.get("goal") or ""
-            behavior_id = row.get("behavior_id") or ""
-            key = behavior_id if (args.group_by == "behavior_id" and behavior_id) else goal
+            key = goal
             if not key or not goal:
                 continue
             entry = experiments.setdefault(key, {"goal": goal, "attempts": []})

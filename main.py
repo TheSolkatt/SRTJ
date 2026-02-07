@@ -4,6 +4,7 @@ Main experiment entry point using real datasets and data loaders.
 import argparse
 import csv
 import json
+import os
 import random
 import re
 import sys
@@ -30,7 +31,6 @@ class AttemptLogger:
         "mode",
         "goal",
         "goal_tags",
-        "behavior_id",
         "final_prompt",
         "target_response",
         "verifier_score",
@@ -123,7 +123,6 @@ class AttemptLogger:
                 "mode": (mode or "").strip(),
                 "goal": goal.prompt,
                 "goal_tags": goal_tags_json,
-                "behavior_id": getattr(goal, "behavior_id", None),
                 "final_prompt": f"\n{final_prompt}",
                 "target_response": f"\n{target_response}",
                 "verifier_score": f"\n{verifier_score}",
@@ -152,7 +151,6 @@ def run_experiment(
     random_sample: bool = False,
     sample_seed: int | None = None,
     goal_index: int | None = None,
-    behavior_id: str | None = None,
     harmbench_path: str | None = None,
     warmup_path: str | None = None,
     target_model: str | None = None,
@@ -186,11 +184,87 @@ def run_experiment(
     disable_symbolizer = disable_symbolizer or fast
 
     # Mixed-model clients: planner + attacker + target + verifier.
-    attacker_client = LLMClient(model_name="deepseek-r1")
-    target_client = LLMClient(model_name=target_model or "gpt-3.5-turbo-1106")
-    verifier_client = LLMClient(model_name="gpt-4o")
-    planner_client = None if disable_planner else LLMClient(model_name="deepseek-r1")
-    analysis_client = LLMClient(model_name="gpt-4o")
+    #
+    # Multi-key / multi-provider support:
+    # - Default provider: OPENAI_API_KEY/OPENAI_BASE_URL, falling back to api_key/base_url
+    # - OpenRouter provider: OPENROUTER_API_KEY/OPENROUTER_BASE_URL
+    # - Per-role overrides: SRTJ_<ROLE>_API_KEY / SRTJ_<ROLE>_BASE_URL
+
+    def _env(key: str) -> Optional[str]:
+        val = os.getenv(key)
+        if val is None:
+            return None
+        val = str(val).strip()
+        return val or None
+
+    def _default_api_key() -> Optional[str]:
+        # Prefer project-local .env `api_key` over globally-exported `OPENAI_API_KEY`.
+        # This avoids surprises when the user has a stale/invalid OPENAI_API_KEY in their shell.
+        return _env("api_key") or _env("OPENAI_API_KEY")
+
+    def _default_base_url() -> Optional[str]:
+        # Prefer project-local .env `base_url` over globally-exported `OPENAI_BASE_URL`.
+        return _env("base_url") or _env("OPENAI_BASE_URL")
+
+    def _openrouter_api_key() -> Optional[str]:
+        return _env("OPENROUTER_API_KEY")
+
+    def _openrouter_base_url() -> str:
+        return _env("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
+
+    def _mk_client(model_name: str, provider: str, role: str) -> LLMClient:
+        role_key = _env(f"SRTJ_{role}_API_KEY")
+        role_url = _env(f"SRTJ_{role}_BASE_URL")
+        if role_key or role_url:
+            return LLMClient(model_name=model_name, api_key=role_key, base_url=role_url)
+        if provider == "openrouter":
+            return LLMClient(
+                model_name=model_name,
+                api_key=_openrouter_api_key(),
+                base_url=_openrouter_base_url(),
+            )
+        return LLMClient(
+            model_name=model_name,
+            api_key=_default_api_key(),
+            base_url=_default_base_url(),
+        )
+
+    attacker_model_name = _env("SRTJ_ATTACKER_MODEL") or "deepseek-r1"
+    planner_model_name = _env("SRTJ_PLANNER_MODEL") or attacker_model_name
+    verifier_model_name = _env("SRTJ_VERIFIER_MODEL") or "gpt-4o"
+    analysis_model_name = _env("SRTJ_ANALYSIS_MODEL") or verifier_model_name
+    target_model_name = target_model or _env("SRTJ_TARGET_MODEL") or "gpt-3.5-turbo-1106"
+
+    openrouter_targets_raw = _env("SRTJ_OPENROUTER_TARGETS")
+    if openrouter_targets_raw:
+        openrouter_targets = {m.strip() for m in openrouter_targets_raw.split(",") if m.strip()}
+    else:
+        # Default OpenRouter targets include both short aliases and full OpenRouter-style model ids.
+        openrouter_targets = {
+            "gpt-4o",
+            "openai/gpt-4o-2024-08-06",
+            "llama-3-8B-Instruct",
+            "meta-llama/llama-3-8b-instruct",
+            "llama-3-70B-Instruct",
+            "meta-llama/llama-3-70b-instruct",
+            "claude-3-5-sonnet-20240620",
+            "anthropic/claude-3.5-sonnet-20240620",
+        }
+
+    # Only route the target model based on this list; other roles are fixed defaults.
+    have_openrouter = bool(_openrouter_api_key())
+    target_provider = "openrouter" if (have_openrouter and target_model_name in openrouter_targets) else "default"
+    verifier_provider = "openrouter" if have_openrouter else "default"
+
+    attacker_client = _mk_client(attacker_model_name, provider="default", role="ATTACKER")
+    target_client = _mk_client(target_model_name, provider=target_provider, role="TARGET")
+    verifier_client = _mk_client(verifier_model_name, provider=verifier_provider, role="VERIFIER")
+    planner_client = (
+        None
+        if disable_planner
+        else _mk_client(planner_model_name, provider="default", role="PLANNER")
+    )
+    analysis_client = _mk_client(analysis_model_name, provider=verifier_provider, role="ANALYSIS")
     logger = AttemptLogger(log_path)
 
     manager = Manager(
@@ -258,17 +332,6 @@ def run_experiment(
         resume_from_log = None
         random_sample = False
         num_samples = 1
-    elif behavior_id:
-        filtered = [g for g in goals if (g.behavior_id or "") == behavior_id]
-        if not filtered:
-            print(f"[main] No goal found with behavior_id={behavior_id}")
-            return
-        goals = filtered
-        dataset_label = f"{dataset_label or dataset} (behavior_id {behavior_id})"
-        resume_from_log = None
-        random_sample = False
-        num_samples = 1
-
     # 统一执行循环
     total_goals = len(goals)
     skipped_goals = 0
@@ -279,12 +342,15 @@ def run_experiment(
             with resume_path.open(newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    # support new logs ("goal") and legacy logs ("goal_id")
-                    goal_text = row.get("goal") or row.get("goal_id")
+                    goal_text = row.get("goal")
                     if goal_text:
                         seen_goals.add(goal_text)
             if seen_goals:
-                goals = [goal for goal in goals if goal.goal_id not in seen_goals and goal.prompt not in seen_goals]
+                goals = [
+                    goal
+                    for goal in goals
+                    if goal.goal_id not in seen_goals
+                ]
                 skipped_goals = total_goals - len(goals)
         else:
             print(f"[main] Resume log not found at {resume_path}; continuing without resume.")
@@ -315,7 +381,7 @@ def run_experiment(
         initial_rules = len(manager.memory.layer3_rules) + len(manager.memory.layer2_rules) + len(manager.memory.layer1_rules)
         manager.process_goal(goal)
         if save_per_goal:
-            manager.memory.flush(force=True)
+            manager.memory.flush()
         current_rules = len(manager.memory.layer3_rules) + len(manager.memory.layer2_rules) + len(manager.memory.layer1_rules)
         
         if current_rules > initial_rules:
@@ -324,7 +390,7 @@ def run_experiment(
         else:
             print()
 
-    manager.memory.flush(force=True)
+    manager.memory.flush()
 
     final_layer3 = len(manager.memory.layer3_rules)
     final_layer2 = len(manager.memory.layer2_rules)
@@ -410,7 +476,7 @@ if __name__ == "__main__":
         "--resume-from-log",
         type=str,
         default=None,
-        help="Resume by skipping goal_ids that already appear in this CSV log.",
+        help="Resume by skipping goals that already appear in this CSV log.",
     )
     parser.add_argument(
         "--success-threshold",
@@ -490,12 +556,6 @@ if __name__ == "__main__":
         default=None,
         help="Select a single goal by 1-based index from the loaded dataset.",
     )
-    parser.add_argument(
-        "--behavior-id",
-        type=str,
-        default=None,
-        help="Select a single goal by behavior_id (e.g., HarmBench BehaviorID).",
-    )
     args = parser.parse_args()
     run_experiment(
         dataset=args.dataset,
@@ -510,7 +570,6 @@ if __name__ == "__main__":
         random_sample=args.random_sample,
         sample_seed=args.sample_seed,
         goal_index=args.goal_index,
-        behavior_id=args.behavior_id,
         harmbench_path=args.harmbench_path,
         warmup_path=args.warmup_path,
         target_model=args.target_model,

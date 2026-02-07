@@ -108,11 +108,7 @@ class Manager:
         return " ".join(lines)[:300].strip()
 
     def _goal_text(self, goal: AttackGoal) -> str:
-        prompt = (goal.prompt or "").strip()
-        context = (goal.context or "").strip()
-        if context:
-            return f"{prompt}\n\n[Context]\n{context}"
-        return prompt
+        return (goal.prompt or "").strip()
 
     def _combine_rules(
         self,
@@ -336,12 +332,7 @@ class Manager:
             print(f"[Blind Attack] Target error: {exc}")
             return False, "Target error", False
 
-        verdict = self.verifier.verify(
-            goal.prompt,
-            target_resp,
-            behavior_id=goal.behavior_id,
-            context=goal.context,
-        )
+        verdict = self.verifier.verify(goal.prompt, target_resp)
         if not verdict:
             print("[Blind Attack] Verifier error/unavailable; skipping attempt.")
             return False, "Verifier error", False
@@ -367,11 +358,6 @@ class Manager:
             )
         reasoning = verdict.get("reasoning", "")
         if verdict.get("success"):
-            score = verdict.get("score")
-            try:
-                score_value = float(score) if score is not None else 0.0
-            except (TypeError, ValueError):
-                score_value = 0.0
             self._handle_success(
                 goal=goal,
                 target_resp=target_resp,
@@ -407,7 +393,7 @@ class Manager:
         
         # 2. Analyze
         goal_text = self._goal_text(goal)
-        tags = [str(goal.category).strip()] if goal.category else []
+        tags = [goal.category.strip()] if getattr(goal, "category", "") else []
         print(f"[Tags]    {tags}")
         
         # 3/4. Retrieve + Attack Loop
@@ -432,8 +418,6 @@ class Manager:
             # Keep ASP and blind attempt budgets separate (not shared).
             max_asp_attempts = 5
             max_blind_attempts = 5
-
-        guidance_text = ""
 
         def blind_loop(label_prefix: str) -> bool:
             prev_reason = None
@@ -575,13 +559,7 @@ class Manager:
                     )
                 
                 if verdict.get("success"):
-                    score = verdict.get("score")
-                    try:
-                        score_value = float(score) if score is not None else 0.0
-                    except (TypeError, ValueError):
-                        score_value = 0.0
                     asp_fail_streak = 0
-                    allow_harvest = not self.frozen and not rules
                     self._handle_success(
                         goal=goal,
                         target_resp=target_resp,
@@ -590,7 +568,7 @@ class Manager:
                         tags=tags,
                         verdict=verdict,
                         attempt_label=f"Attempt {attempt}",
-                        allow_harvest=allow_harvest,
+                        allow_harvest=False,  # harvest only on blind success
                         history_attempts=failed_prompts,
                     )
                     success_achieved = True

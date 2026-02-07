@@ -206,7 +206,7 @@ has_dim(R, "strategy").
 
 当前日志字段包括：
 ```
-timestamp, attempt, mode, goal, goal_tags, behavior_id, final_prompt,
+timestamp, attempt, mode, goal, goal_tags, final_prompt,
 target_response, verifier_score, success, reasoning, guidance_used,
 rule_ids, rule_scores, rule_tags, dims_covered, banned_rules
 ```

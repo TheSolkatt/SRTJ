@@ -1,0 +1,132 @@
+{
+  "config": {
+    "min_usage": 10,
+    "min_success_rate": 0.15
+  },
+  "rules": {
+    "rule_20260205112958": {
+      "usage_count": 15,
+      "success_count": 4
+    },
+    "rule_20260205113729": {
+      "usage_count": 17,
+      "success_count": 5
+    },
+    "rule_20260205115838": {
+      "usage_count": 133,
+      "success_count": 59
+    },
+    "rule_20260205122009": {
+      "usage_count": 8,
+      "success_count": 2
+    },
+    "rule_20260205172254": {
+      "usage_count": 44,
+      "success_count": 12
+    },
+    "rule_20260205173657": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260205174439": {
+      "usage_count": 41,
+      "success_count": 10
+    },
+    "rule_20260205180149": {
+      "usage_count": 21,
+      "success_count": 7
+    },
+    "rule_20260205181924": {
+      "usage_count": 10,
+      "success_count": 2
+    },
+    "rule_20260205184748": {
+      "usage_count": 12,
+      "success_count": 4
+    },
+    "rule_20260205203435": {
+      "usage_count": 17,
+      "success_count": 3
+    },
+    "rule_20260205204533": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260205205614": {
+      "usage_count": 36,
+      "success_count": 6
+    },
+    "rule_20260205221632": {
+      "usage_count": 17,
+      "success_count": 3
+    },
+    "rule_20260205225024": {
+      "usage_count": 44,
+      "success_count": 18
+    },
+    "rule_20260205232113": {
+      "usage_count": 12,
+      "success_count": 2
+    },
+    "rule_20260206000357": {
+      "usage_count": 19,
+      "success_count": 9
+    },
+    "rule_20260206000940": {
+      "usage_count": 21,
+      "success_count": 3
+    },
+    "rule_20260206005131": {
+      "usage_count": 13,
+      "success_count": 2
+    },
+    "rule_20260206012604": {
+      "usage_count": 18,
+      "success_count": 5
+    },
+    "rule_20260206020349": {
+      "usage_count": 47,
+      "success_count": 17
+    },
+    "rule_20260206021138": {
+      "usage_count": 13,
+      "success_count": 3
+    },
+    "rule_20260206024138": {
+      "usage_count": 30,
+      "success_count": 8
+    },
+    "rule_20260206025938": {
+      "usage_count": 59,
+      "success_count": 28
+    },
+    "rule_20260206041000": {
+      "usage_count": 42,
+      "success_count": 25
+    },
+    "rule_20260206041948": {
+      "usage_count": 12,
+      "success_count": 4
+    },
+    "rule_20260206043448": {
+      "usage_count": 11,
+      "success_count": 1
+    },
+    "rule_20260206050307": {
+      "usage_count": 11,
+      "success_count": 2
+    },
+    "rule_20260206062621": {
+      "usage_count": 18,
+      "success_count": 8
+    },
+    "rule_20260206063606": {
+      "usage_count": 7,
+      "success_count": 4
+    },
+    "rule_20260206064547": {
+      "usage_count": 1,
+      "success_count": 1
+    }
+  }
+}
