@@ -229,8 +229,6 @@ def run_experiment(
             base_url=_default_base_url(),
         )
 
-    attacker_model_name = _env("SRTJ_ATTACKER_MODEL") or "deepseek-r1"
-    planner_model_name = _env("SRTJ_PLANNER_MODEL") or attacker_model_name
     verifier_model_name = _env("SRTJ_VERIFIER_MODEL") or "gpt-4o"
     analysis_model_name = _env("SRTJ_ANALYSIS_MODEL") or verifier_model_name
     target_model_name = target_model or _env("SRTJ_TARGET_MODEL") or "gpt-3.5-turbo-1106"
@@ -251,20 +249,55 @@ def run_experiment(
             "anthropic/claude-3.5-sonnet-20240620",
         }
 
-    # Only route the target model based on this list; other roles are fixed defaults.
     have_openrouter = bool(_openrouter_api_key())
-    target_provider = "openrouter" if (have_openrouter and target_model_name in openrouter_targets) else "default"
+    have_default = bool(_default_api_key())
+
+    # User preference: route everything through OpenRouter when available,
+    # except `gpt-3.5-turbo-1106` which uses the user's own key/provider.
+    gpt35_targets = {"gpt-3.5-turbo-1106", "gpt-3.5-turbo"}
+
+    # Target routing:
+    # - If SRTJ_OPENROUTER_TARGETS is explicitly set, honor it as an allowlist.
+    # - Otherwise (default), use OpenRouter for all targets except gpt-3.5.
+    if openrouter_targets_raw:
+        target_provider = "openrouter" if (have_openrouter and target_model_name in openrouter_targets) else "default"
+    else:
+        target_provider = "openrouter" if (have_openrouter and target_model_name not in gpt35_targets) else "default"
     verifier_provider = "openrouter" if have_openrouter else "default"
 
-    attacker_client = _mk_client(attacker_model_name, provider="default", role="ATTACKER")
+    # Pipeline provider for attacker/planner:
+    # If OpenRouter is configured, route attacker/planner to OpenRouter by default to avoid
+    # burning the user's default key on non-target roles. Per-role overrides still apply.
+    pipeline_provider = "openrouter" if have_openrouter else "default"
+
+    # If we use OpenRouter, use OpenRouter-friendly default model ids.
+    default_attacker_model = "deepseek/deepseek-r1" if pipeline_provider == "openrouter" else "deepseek-r1"
+    attacker_model_name = _env("SRTJ_ATTACKER_MODEL") or default_attacker_model
+    planner_model_name = _env("SRTJ_PLANNER_MODEL") or attacker_model_name
+
+    attacker_client = _mk_client(attacker_model_name, provider=pipeline_provider, role="ATTACKER")
     target_client = _mk_client(target_model_name, provider=target_provider, role="TARGET")
     verifier_client = _mk_client(verifier_model_name, provider=verifier_provider, role="VERIFIER")
     planner_client = (
         None
         if disable_planner
-        else _mk_client(planner_model_name, provider="default", role="PLANNER")
+        else _mk_client(planner_model_name, provider=pipeline_provider, role="PLANNER")
     )
     analysis_client = _mk_client(analysis_model_name, provider=verifier_provider, role="ANALYSIS")
+
+    # Transparent, non-sensitive routing info (no keys printed).
+    try:
+        planner_info = "disabled" if disable_planner else f"{pipeline_provider}:{planner_model_name}"
+        print(
+            "[Routing] "
+            f"ATTACKER={pipeline_provider}:{attacker_model_name} | "
+            f"PLANNER={planner_info} | "
+            f"TARGET={target_provider}:{target_model_name} | "
+            f"VERIFIER={verifier_provider}:{verifier_model_name} | "
+            f"ANALYSIS={verifier_provider}:{analysis_model_name}"
+        )
+    except Exception:
+        pass
     logger = AttemptLogger(log_path)
 
     manager = Manager(

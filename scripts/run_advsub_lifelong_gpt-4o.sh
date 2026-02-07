@@ -268,7 +268,7 @@ if [ "$frozen_only" = "0" ]; then
       cp -R "$prev_lib" "$run_lib"
     fi
 
-    run_cmd $((i + 1)) "[Run ${i}/3] lifelong without reset (harmbench_200)" \
+    run_cmd $((i + 1)) "[Run ${i}/5] lifelong without reset (harmbench_200)" \
       "${python_cmd} main.py --stage lifelong --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${run_lib} ${save_flags}" \
       "$run_log" \
       "$run_lib"
@@ -304,7 +304,7 @@ else
   cp -R "$prev_lib" "$frozen_lib"
 fi
 
-run_cmd 5 "[Run 1/1] frozen eval (harmbench_200)" \
+run_cmd 7 "[Run 1/1] frozen eval (harmbench_200)" \
   "${python_cmd} main.py --stage lifelong --frozen --harmbench-path ${harmbench_path} --target-model ${target_model} --library-root ${frozen_lib} ${save_flags}" \
   "$frozen_log" \
   "$frozen_lib"
